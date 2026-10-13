@@ -477,6 +477,9 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .wb[aria-pressed="true"] i { opacity: 1; }
 .wb:disabled { opacity: .3; cursor: not-allowed; }
 .wb.w0 { --wc: #2fbf71; } .wb.w1 { --wc: #f2c230; } .wb.w2 { --wc: #e5484d; }
+.pen { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
+.pen input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
+.penb { color: #b3261e; font-weight: 600; }
 fieldset.tyres { border: 0; padding: 0; margin: 0; min-width: 0; }
 fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
 .chk-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
@@ -739,6 +742,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   function fmtTime(ms) {
     return pad(Math.floor(ms / 60000), 2) + ':' + pad(Math.floor((ms % 60000) / 1000), 2) + '.' + pad(ms % 1000, 3);
   }
+  function fmtPen(ms) { return ms % 1000 === 0 && ms < 60000 ? (ms / 1000) + 's' : (ms < 60000 ? (ms / 1000).toFixed(3) + 's' : fmtTime(ms)); }
   function fmtGap(ms) { return '+' + (ms < 60000 ? (ms / 1000).toFixed(3) : fmtTime(ms)); }
   function timeText(v) { return typeof v === 'number' ? fmtTime(v) : (v === 'R' ? 'RIT' : ''); }
   // null = vuoto, 'R' = ritiro, numero = millisecondi, undefined = formato non valido
@@ -810,6 +814,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     });
     return m;
   }
+  function penOf(s, rid, sid, did) { var m = s.results[rid] && s.results[rid].pen, v = m && m[sid] && m[sid][did]; return typeof v === 'number' && v > 0 ? v : 0; }
   function timesOf(s, rid) { return (s.results[rid] && s.results[rid].times) || {}; }
   function scored(s, r, t) { var m = timesOf(s, r.id)[t.id]; return !!m && Object.keys(m).length > 0; }
   function participants(s, r) {
@@ -820,25 +825,25 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   function stageIds(arr) { return arr.map(function (t) { return t.id; }); }
 
   // Somma dei tempi su un insieme di tappe. Ritirati e non classificati vanno in coda.
-  function classify(s, r, ids) {
+  function classify(s, r, ids, noPen) {
     if (!ids.length) return [];
     var T = timesOf(s, r.id), part = participants(s, r), ok = [], ret = [], nc = [], best = {};
     ids.forEach(function (id) {
-      Object.keys(T[id] || {}).forEach(function (k) { var v = T[id][k]; if (typeof v === 'number' && (best[id] === undefined || v < best[id])) best[id] = v; });
+      Object.keys(T[id] || {}).forEach(function (k) { var v = T[id][k]; if (typeof v === 'number') { v += noPen ? 0 : penOf(s, r.id, id, k); if (best[id] === undefined || v < best[id]) best[id] = v; } });
     });
     s.drivers.forEach(function (d) {
       if (!part[d.id]) return;
-      var total = 0, hasR = false, miss = false, rit = 0;
+      var total = 0, hasR = false, miss = false, rit = 0, pen = 0;
       ids.forEach(function (id) {
         var v = (T[id] || {})[d.id];
         if (v === 'R') {
           // Ritiro: tempo del primo della tappa + 10 minuti
           if (best[id] === undefined) hasR = true; else { total += best[id] + RIT_PENALTY; rit++; }
-        } else if (typeof v === 'number') total += v; else miss = true;
+        } else if (typeof v === 'number') { var pn = noPen ? 0 : penOf(s, r.id, id, d.id); total += v + pn; pen += pn; } else miss = true;
       });
       if (hasR) ret.push({ d: d, status: 'R' });
       else if (miss) nc.push({ d: d, status: 'nc' });
-      else ok.push({ d: d, status: 'ok', total: total, rit: rit });
+      else ok.push({ d: d, status: 'ok', total: total, rit: rit, pen: pen });
     });
     ok.sort(function (a, b) { return a.total - b.total; });
     ok.forEach(function (x, i) { x.pos = i && ok[i - 1].total === x.total ? ok[i - 1].pos : i + 1; x.gap = x.total - ok[0].total; x.prev = i ? x.total - ok[i - 1].total : 0; });
@@ -867,8 +872,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   // Classifica per assegnare posizioni e punti. Se i non partecipanti NON influiscono (absentAffect === false) sono tolti
   // dalla graduatoria e chi partecipa scala di posto; altrimenti restano e occupano la loro posizione.
-  function clsFor(s, r, ids) {
-    var l = classify(s, r, ids);
+  function clsFor(s, r, ids, noPen) {
+    var l = classify(s, r, ids, noPen);
     if (s.absentAffect !== false || !Array.isArray(r.assenti) || !r.assenti.length) return l;
     var out = [], prev = null, k = 0;
     l.forEach(function (x) {
@@ -882,9 +887,9 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   // Punti per ogni classifica, come se l'evento finisse dopo la tappa t
   function pointsAt(s, r, t) {
     var out = {};
-    function give(key, ids, tbl) {
+    function give(key, ids, tbl, noPen) {
       if (!ids.length || !tbl || !tbl.length) return;
-      clsFor(s, r, ids).forEach(function (x) {
+      clsFor(s, r, ids, noPen).forEach(function (x) {
         if (x.status !== 'ok' || absent(r, x.d.id)) return;
         out[x.d.id] = out[x.d.id] || {};
         out[x.d.id][key] = tbl[x.pos - 1] || 0;
@@ -895,7 +900,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     give('sat', stagesUpTo(s, r, t, function (k) { return k.kind !== 'shd' && k.day === 'sab'; }), s.satPoints);
     give('sun', stagesUpTo(s, r, t, function (k) { return k.kind !== 'shd' && k.day === 'dom'; }), s.sunPoints);
     var pw = stagesUpTo(s, r, t, function (k) { return k.kind === 'pow'; });
-    if (pw.length) give('ps', [pw[pw.length - 1]], s.psPoints);
+    if (pw.length) give('ps', [pw[pw.length - 1]], s.psPoints, true);
     return out;
   }
   function evStatus(s, r) {
@@ -910,8 +915,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var ord = ordered(r), counted = ord.filter(function (t) { return inGen(s, t); });
     var out = { pos: {}, ps: {}, shd: {}, sat: {}, sun: {}, rit: {} }, T = timesOf(s, r.id);
     counted.forEach(function (t) { Object.keys(T[t.id] || {}).forEach(function (k) { if (T[t.id][k] === 'R') out.rit[k] = true; }); });
-    function fill(map, ids, withR) {
-      clsFor(s, r, ids).forEach(function (x) {
+    function fill(map, ids, withR, noPen) {
+      clsFor(s, r, ids, noPen).forEach(function (x) {
         if (x.status === 'ok') map[x.d.id] = x.pos; else if (x.status === 'R' && withR) map[x.d.id] = 'R';
       });
     }
@@ -920,7 +925,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     fill(out.sat, stageIds(counted.filter(function (t) { return t.day === 'sab'; })), false);
     fill(out.sun, stageIds(counted.filter(function (t) { return t.day === 'dom'; })), false);
     var pw = counted.filter(function (t) { return t.kind === 'pow'; });
-    if (pw.length) fill(out.ps, [pw[pw.length - 1].id], false);
+    if (pw.length) fill(out.ps, [pw[pw.length - 1].id], false, true);
     return out;
   }
   // Risultati validi per il campionato: calcolati dai tempi se l'evento ha le tappe e sono tutte compilate, altrimenti inseriti a mano
@@ -1512,7 +1517,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       var ok = x.status === 'ok', first = ok && x.pos === 1, p = (pm && pm[x.d.id]) || {}, tot = 0;
       var cells = pc.map(function (k) { tot += p[k] || 0; return '<td class="num pcol">' + (p[k] ? p[k] : '–') + '</td>'; }).join('');
       return '<tr><td class="posc c-pos' + (first ? ' p1' : '') + '">' + (ok ? posCell(x.pos, mv ? mv[x.d.id] : undefined) : '–') + '</td><td class="c-drv">' + drvCell(x.d) + '</td>' +
-        '<td class="num' + (x.status === 'R' ? ' dnf' : '') + '">' + (ok ? fmtTime(x.total) + (x.rit ? ' <small title="Ritiro: tempo del primo + 10 minuti">RIT</small>' : '') : (x.status === 'R' ? 'RIT' : '–')) + '</td>' +
+        '<td class="num' + (x.status === 'R' ? ' dnf' : '') + '">' + (ok ? fmtTime(x.total) + (x.pen ? ' <small class="penb" title="Penalità incluse nel tempo">+' + fmtPen(x.pen) + ' pen.</small>' : '') + (x.rit ? ' <small title="Ritiro: tempo del primo + 10 minuti">RIT</small>' : '') : (x.status === 'R' ? 'RIT' : '–')) + '</td>' +
         '<td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.gap)) : '') + '</td><td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.prev)) : '') + '</td>' +
         cells + (pm ? '<td class="num pts tot">' + tot + '</td>' : '') + '</tr>';
     }).join('') + '</tbody></table></div>';
@@ -1537,7 +1542,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       return out + clsTable(s, classify(s, r, ids), pointsAt(s, r, sel), mvs) +
         '<p class="hint">' + (sel.id === last.id && evStatus(s, r) === 'done' ? 'Classifica finale: i punti sono quelli assegnati al campionato.' : 'Punti provvisori: sono quelli che verrebbero assegnati se l’evento finisse dopo questa tappa.') + '</p>';
     }
-    return out + clsTable(s, classify(s, r, ids), null, mvs) + (mvs ? '<p class="hint">Le frecce indicano le posizioni guadagnate o perse rispetto alla tappa precedente.</p>' : '');
+    return out + clsTable(s, classify(s, r, ids, ui.cls === 'prova'), null, mvs) + (mvs ? '<p class="hint">Le frecce indicano le posizioni guadagnate o perse rispetto alla tappa precedente.</p>' : '');
   }
   function finalHtml(s, r) {
     if (!r.tappe.length) return '';
@@ -1742,18 +1747,23 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   function entryHtml(s, r, sel) {
     inheritTyres(s, r, sel);
-    var T = timesOf(s, r.id)[sel.id] || {}, cl = classify(s, r, [sel.id]), pm = {};
+    var T = timesOf(s, r.id)[sel.id] || {}, cl = classify(s, r, [sel.id], true), pm = {};
     cl.forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
     var tyres = tyresOf(r), weekend = sel.day === 'sab' || sel.day === 'dom';
-    var note = '<p class="hint">Ordine dei piloti: ' + (weekend ? 'classifica generale dell’evento prima di questa tappa' : 'classifica del campionato') + '. Gomme disponibili: ' + esc(tyres.map(function (t) { return t[1]; }).join(', ')) + ' (si cambiano modificando l’evento).</p>';
+    var note = '<p class="hint">Ordine dei piloti: ' + (weekend ? 'classifica generale dell’evento prima di questa tappa' : 'classifica del campionato') + '. Gomme disponibili: ' + esc(tyres.map(function (t) { return t[1]; }).join(', ')) + ' (si cambiano modificando l’evento). Le penalità non cambiano la classifica della prova né i punti della Power Stage: si sommano al tempo nelle classifiche di giornata e generale.</p>';
     return note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
       var id = 'tm-' + sel.id + '-' + d.id, ty = 'ty-' + sel.id + '-' + d.id, rec = tyreRec(s, r.id, sel.id, d.id);
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
       return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
         '<td class="num"><label class="sr" for="' + id + '">Tempo di ' + esc(d.name) + '</label><div class="tmwrap"><input type="text" class="tm" id="' + id + '" value="' + esc(timeText(T[d.id])) + '" placeholder="00:00.000" inputmode="numeric" enterkeyhint="next" autocomplete="off" autocapitalize="characters" spellcheck="false" data-change="time" data-stage="' + sel.id + '" data-driver="' + d.id + '"><button class="btn small ghost" type="button" data-action="time-rit" data-for="' + id + '" aria-label="Segna ritiro per ' + esc(d.name) + '">RIT</button></div></td></tr>' +
-        '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div></div></td></tr>';
+        '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div>' + penHtml(s, r, sel, d) + '</div></td></tr>';
     }).join('') + '</tbody></table></div>';
   }
+  function penHtml(s, r, sel, d) {
+    var v = penOf(s, r.id, sel.id, d.id), id = 'pn-' + sel.id + '-' + d.id;
+    return '<div class="pen"><label for="' + id + '">Penalità</label><input type="text" class="pn" id="' + id + '" value="' + (v ? esc(fmtTimeShort(v)) : '') + '" placeholder="0 (es. 10 oppure 1:05.5)" inputmode="decimal" autocomplete="off" spellcheck="false" data-change="pen" data-stage="' + sel.id + '" data-driver="' + d.id + '"><span class="mut">sec</span></div>';
+  }
+  function fmtTimeShort(ms) { return ms < 60000 ? String(ms / 1000).replace('.', ',') : fmtTime(ms); }
 
   function stageTip(t) {
     return [dayName(t.day), t.service ? 'Servizio ' + labelOf(SERVICE, t.service).toLowerCase() : '', labelOf(WEATHER, t.weather), [labelOf(TOD, t.tod), t.time].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
@@ -2720,7 +2730,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var sel = selStage(r);
     if (sel) {
       var pm = {};
-      classify(state, r, [sel.id]).forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
+      classify(state, r, [sel.id], true).forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
       Array.prototype.forEach.call(document.querySelectorAll('[data-pos]'), function (el) { el.textContent = pm[el.dataset.pos] === undefined ? '–' : pm[el.dataset.pos]; });
     }
     flush();
@@ -2745,7 +2755,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     if (!r) return;
     if (r.times) Object.keys(r.times).forEach(function (k) { if (!Object.keys(r.times[k]).length) delete r.times[k]; });
     if (r.tyres) Object.keys(r.tyres).forEach(function (k) { if (!Object.keys(r.tyres[k]).length) delete r.tyres[k]; });
-    if (RES_KEYS.concat(['times', 'tyres']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
+    if (r.pen) Object.keys(r.pen).forEach(function (k) { if (!Object.keys(r.pen[k]).length) delete r.pen[k]; });
+    if (RES_KEYS.concat(['times', 'tyres', 'pen']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
   }
 
 
@@ -3020,6 +3031,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       r.tappe = r.tappe.filter(function (t) { return t.id !== id; });
       if (state.results[r.id] && state.results[r.id].times) delete state.results[r.id].times[id];
       if (state.results[r.id] && state.results[r.id].tyres) delete state.results[r.id].tyres[id];
+      if (state.results[r.id] && state.results[r.id].pen) delete state.results[r.id].pen[id];
       cleanup(r.id); ui.stage = null; ui.editStage = null;
       commit(); toast('Tappa eliminata');
     },
@@ -3040,6 +3052,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
           RES_KEYS.forEach(function (k) { if (r[k]) delete r[k][id]; });
           if (r.times) Object.keys(r.times).forEach(function (sid) { delete r.times[sid][id]; });
           if (r.tyres) Object.keys(r.tyres).forEach(function (sid) { delete r.tyres[sid][id]; });
+          if (r.pen) Object.keys(r.pen).forEach(function (sid) { delete r.pen[sid][id]; });
           cleanup(rid);
         });
       }
@@ -3210,6 +3223,21 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (v === null) delete m[did]; else m[did] = v;
       cleanup(rid);
       el.value = timeText(v);
+      refreshEvent();
+    },
+    pen: function (el) {
+      var rid = ui.manage, sid = el.dataset.stage, did = el.dataset.driver, v = parseTime(el.value);
+      if (v === undefined || v === 'R') {
+        toast('Penalità non valida. Scrivi i secondi (es. 10 oppure 5,5) oppure MM:SS.mmm.');
+        el.value = penOf(state, rid, sid, did) ? fmtTimeShort(penOf(state, rid, sid, did)) : '';
+        return;
+      }
+      var res = state.results[rid] = state.results[rid] || { pos: {} };
+      res.pen = res.pen || {};
+      var m = res.pen[sid] = res.pen[sid] || {};
+      if (v === null) delete m[did]; else m[did] = v;
+      cleanup(rid);
+      el.value = v ? fmtTimeShort(v) : '';
       refreshEvent();
     },
     hf: function (el) { ui.hf = el.value; render(); },
