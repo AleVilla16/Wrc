@@ -1352,11 +1352,11 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var body = rows.map(function (row, ri) {
       var d = row.d;
       var cells = sr.map(function (r) {
-        if (!hasResults(s, r.id)) return mxCells(false);
         if (absent(r, d.id)) {
           var fr = resFull(s, r.id), has = fr.pos && (fr.pos[d.id] !== undefined || hasBonus(fr, d.id));
           return mxCells(true, 'NB', has ? ptsFull(s, r.id, d.id) : null);
         }
+        if (!hasResults(s, r.id)) return mxCells(false);
         var res = resOf(s, r.id), p = res.pos[d.id], t = pts(s, r.id, d.id);
         if (p === 'R' || (res.rit && res.rit[d.id])) return mxCells(true, 'X', t);
         return mxCells(true, typeof p === 'number' ? p : undefined, t);
