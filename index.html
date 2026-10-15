@@ -1609,8 +1609,38 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     }).join('') + '</span></span>';
   }
   // Le gomme (tipo e usura) di ogni pilota si ripartono da quelle dell'ultima tappa precedente in cui sono state indicate
+  // Con una strategia gomme impostata, le gomme di ogni tappa si inseriscono da sole (record con a:1).
+  // Nella tappa in cui si monta un treno lo stato iniziale è verde; nelle successive parte da quello finale della tappa prima.
+  // I dati inseriti a mano (tipo cambiato, usura toccata) non vengono sovrascritti.
+  function applyStrategy(s, r) {
+    var ord = ordered(r);
+    if (!ord.length) return false;
+    var before = JSON.stringify((s.results[r.id] && s.results[r.id].tyres) || {});
+    s.drivers.forEach(function (d) {
+      var all = s.results[r.id] && s.results[r.id].tyres;
+      if (all) Object.keys(all).forEach(function (sid) { var m = all[sid]; if (m[d.id] && m[d.id].a) delete m[d.id]; });
+      var g = gmGet(r, d.id);
+      if (!g || !g.plan.length) return;
+      gmStats(r, d.id).rows.forEach(function (row) {
+        for (var i = row.idx; i < row.end; i++) {
+          var sid = ord[i].id;
+          if (tyreRec(s, r.id, sid, d.id)) continue;
+          var sv = 0;
+          if (i > row.idx) { var pv = tyreRec(s, r.id, ord[i - 1].id, d.id); if (pv && pv.t === row.t && typeof pv.w === 'number') sv = pv.w; }
+          var res = s.results[r.id] = s.results[r.id] || { pos: {} };
+          res.tyres = res.tyres || {};
+          (res.tyres[sid] = res.tyres[sid] || {})[d.id] = { t: row.t, s: sv, w: sv, a: 1 };
+        }
+      });
+    });
+    cleanup(r.id);
+    return JSON.stringify((s.results[r.id] && s.results[r.id].tyres) || {}) !== before;
+  }
   function inheritTyres(s, r, sel) {
-    if (s !== state || r.locked) return;
+    if (s !== state) return;
+    var strat = applyStrategy(s, r);
+    if (strat) { lastJson = JSON.stringify(state); flush(); }
+    if (r.locked) return;
     var ord = ordered(r), idx = -1, changed = false, all = s.results[r.id] && s.results[r.id].tyres;
     for (var i = 0; i < ord.length; i++) if (ord[i].id === sel.id) idx = i;
     if (idx <= 0 || !all) return;
@@ -2881,7 +2911,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         if (typeof v === 'number' || v === 'R') { mt[x.did] = v; nT++; }
         var old = my[x.did], os = old && typeof old.s === 'number' ? old.s : 0, ow = old && typeof old.w === 'number' ? old.w : 0;
         if (x.tyre) { my[x.did] = { t: x.tyre, s: x.wearStart != null ? x.wearStart : os, w: x.wear != null ? x.wear : ow }; nG++; }
-        else if ((x.wear != null || x.wearStart != null) && old) { if (x.wear != null) old.w = x.wear; if (x.wearStart != null) old.s = x.wearStart; nG++; }
+        else if ((x.wear != null || x.wearStart != null) && old) { delete old.a; if (x.wear != null) old.w = x.wear; if (x.wearStart != null) old.s = x.wearStart; nG++; }
       });
       cleanup(r.id);
       ui.scan = null;
@@ -2993,21 +3023,21 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         var cand = gmServiceStages(r).filter(function (x) { return used.indexOf(x.id) < 0; })[0];
         next = cand ? cand.id : '';
       }
-      g.plan.push({ t: t, from: next }); gmSort(r, did); commit();
+      g.plan.push({ t: t, from: next }); gmSort(r, did); applyStrategy(state, r); commit();
     },
     'gm-del': function (el) {
       var r = findRally(state, ui.manage), g = r && gmGet(r, el.dataset.driver); if (!g) return;
-      g.plan.splice(Number(el.dataset.i), 1); commit();
+      g.plan.splice(Number(el.dataset.i), 1); applyStrategy(state, r); commit();
     },
     'gm-stage': function (el) {
       var r = findRally(state, ui.manage), g = r && gmGet(r, el.dataset.driver), p = g && g.plan[Number(el.dataset.i)]; if (!p) return;
-      p.from = el.dataset.stage || ''; gmSort(r, el.dataset.driver); commit();
+      p.from = el.dataset.stage || ''; gmSort(r, el.dataset.driver); applyStrategy(state, r); commit();
     },
     'gm-copy': function (el) {
       var r = findRally(state, ui.manage), did = el.dataset.driver, g = r && gmGet(r, did); if (!g) return;
       if (!armed('gmc' + did, render)) return;
       state.drivers.forEach(function (d) { if (d.id !== did) r.gomme[d.id] = clone(g); });
-      commit(); toast('Strategia copiata a tutti i piloti');
+      applyStrategy(state, r); commit(); toast('Strategia copiata a tutti i piloti');
     },
     'cal-mode': function (el) { ui.cal = ui.cal === el.dataset.mode ? null : el.dataset.mode; render(); },
     'part-all': function (el) {
@@ -3095,7 +3125,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     wear: function (el) {
       var rec = tyreRec(state, ui.manage, el.dataset.stage, el.dataset.driver);
       if (!rec) return;
-      rec[el.dataset.k === 's' ? 's' : 'w'] = Number(el.dataset.w);
+      rec[el.dataset.k === 's' ? 's' : 'w'] = Number(el.dataset.w); delete rec.a;
       syncWear(el.closest('tr'), rec);
       lastJson = JSON.stringify(state); flush();
     },
@@ -3276,7 +3306,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     },
     'gm-type': function (el) {
       var r = findRally(state, ui.manage), g = r && gmGet(r, el.dataset.driver), p = g && g.plan[Number(el.dataset.i)]; if (!p) return;
-      p.t = el.value; commit();
+      p.t = el.value; applyStrategy(state, r); commit();
     },
     'gm-stock': function (el) {
       var r = findRally(state, ui.manage), g = r && gmGet(r, el.dataset.driver, true); if (!g) return;
