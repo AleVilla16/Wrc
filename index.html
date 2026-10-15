@@ -134,6 +134,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .mx td.pc.p2 { background: #b8bcc6; color: #15171c; }
 .mx td.pc.p3 { background: #a0653a; color: #fff; }
 .mx td.pc.px { background: #d93a2f; color: #fff; }
+.mx td.pc.nb { color: var(--ink-2); font-size: 14px; font-weight: 600; letter-spacing: .04em; }
+.mx td.num.nbp { color: var(--ink-2); font-style: italic; }
 .mx thead th { font-size: 12px; letter-spacing: .08em; }
 .mx th.ev-h span { font-size: 13px; }
 .mx thead th.c-pos { font-size: 11px; letter-spacing: .04em; text-align: center; }
@@ -911,12 +913,12 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var n = r.tappe.filter(function (t) { return scored(s, r, t); }).length;
     return n === 0 ? 'todo' : (n === r.tappe.length ? 'done' : 'live');
   }
-  function derive(s, r) {
+  function derive(s, r, full) {
     var ord = ordered(r), counted = ord.filter(function (t) { return inGen(s, t); });
     var out = { pos: {}, ps: {}, shd: {}, sat: {}, sun: {}, rit: {} }, T = timesOf(s, r.id);
     counted.forEach(function (t) { Object.keys(T[t.id] || {}).forEach(function (k) { if (T[t.id][k] === 'R') out.rit[k] = true; }); });
     function fill(map, ids, withR, noPen) {
-      clsFor(s, r, ids, noPen).forEach(function (x) {
+      (full ? classify(s, r, ids, noPen) : clsFor(s, r, ids, noPen)).forEach(function (x) {
         if (x.status === 'ok') map[x.d.id] = x.pos; else if (x.status === 'R' && withR) map[x.d.id] = 'R';
       });
     }
@@ -957,8 +959,24 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return out;
   }
   function hasResults(s, id) { var r = findRally(s, id); return !!r && evStatus(s, r) === 'done'; }
-  function pts(s, rid, did) {
-    var res = resOf(s, rid); if (!res || !res.pos) return null;
+  // Risultati come se nessuno fosse assente (per mostrare i punti «virtuali» di chi non partecipa)
+  function resFull(s, rid) {
+    var memo = memos.get(s);
+    if (!memo) { memo = {}; memos.set(s, memo); }
+    var k = rid + '#full';
+    if (memo[k]) return memo[k];
+    var r = findRally(s, rid), out;
+    if (!r) out = {};
+    else if (!r.tappe.length) out = s.results[rid] || {};
+    else if (evStatus(s, r) !== 'done') out = {};
+    else out = derive(s, r, true);
+    memo[k] = out;
+    return out;
+  }
+  function ptsFull(s, rid, did) { return ptsRes(s, resFull(s, rid), did); }
+  function pts(s, rid, did) { return ptsRes(s, resOf(s, rid), did); }
+  function ptsRes(s, res, did) {
+    if (!res || !res.pos) return null;
     var p = res.pos[did], t = 0;
     if (typeof p === 'number') t += s.scoring[p - 1] || 0;
     BONUS.forEach(function (b) {
@@ -1321,6 +1339,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   function mxCells(done, p, t) {
     if (!done) return '<td class="pc mut col-sep">·</td><td class="num mut">·</td>';
     var pt = '<td class="num">' + (t || t === 0 && typeof p === 'number' ? t : '') + '</td>';
+    if (p === 'NB') return '<td class="pc nb col-sep" title="Non partecipa al campionato in questo evento">NB</td><td class="num nbp" title="Punti che avrebbe preso: non contano nel totale">' + (t == null ? '' : t) + '</td>';
     if (p === 'X') return '<td class="pc px col-sep">X</td>' + pt;
     if (typeof p !== 'number') return '<td class="pc mut col-sep">–</td>' + pt;
     return '<td class="pc' + (p <= 3 ? ' p' + p : '') + ' col-sep">' + p + '</td>' + pt;
@@ -1334,6 +1353,10 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       var d = row.d;
       var cells = sr.map(function (r) {
         if (!hasResults(s, r.id)) return mxCells(false);
+        if (absent(r, d.id)) {
+          var fr = resFull(s, r.id), has = fr.pos && (fr.pos[d.id] !== undefined || hasBonus(fr, d.id));
+          return mxCells(true, 'NB', has ? ptsFull(s, r.id, d.id) : null);
+        }
         var res = resOf(s, r.id), p = res.pos[d.id], t = pts(s, r.id, d.id);
         if (p === 'R' || (res.rit && res.rit[d.id])) return mxCells(true, 'X', t);
         return mxCells(true, typeof p === 'number' ? p : undefined, t);
@@ -1342,7 +1365,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         cells + '<td class="num pts col-sep">' + row.total + '</td>' + gapCells(rowTotals, ri) + '</tr>';
     }).join('');
     out += '<div class="tablewrap"><table class="std mx">' + mxHead(sr, 'Pilota') + '<tbody>' + body + '</tbody></table></div>';
-    out += '<p class="hint">Pos è la posizione finale nell’evento (oro 1°, argento 2°, bronzo 3°, X ritirato); PT sono i punti dell’evento, bonus compresi (Power Stage, Shakedown, Sabato, Domenica). TOT è il totale; «Dal 1°» e «Dal prec.» sono i punti di distacco dal primo e dal pilota davanti. In parità di punti conta il maggior numero di vittorie, poi di secondi posti e così via.</p>';
+    out += '<p class="hint">Pos è la posizione finale nell’evento (oro 1°, argento 2°, bronzo 3°, X ritirato); NB indica che il pilota non partecipa all’evento: i punti in corsivo sono quelli che avrebbe preso, ma non entrano nel totale. PT sono i punti dell’evento, bonus compresi (Power Stage, Shakedown, Sabato, Domenica). TOT è il totale; «Dal 1°» e «Dal prec.» sono i punti di distacco dal primo e dal pilota davanti. In parità di punti conta il maggior numero di vittorie, poi di secondi posti e così via.</p>';
     out += '<p class="hint">' + sr.map(function (r, i) { return 'E' + (i + 1) + ' ' + esc(shortName(r)); }).join(' · ') + '</p>';
 
     var teams = teamStandings(s, rows);
