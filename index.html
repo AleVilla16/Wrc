@@ -109,10 +109,11 @@ body {
   font-family: var(--f-body);
   font-size: 16px;
   line-height: 1.5;
-  padding-inline: 16px;
+  --gut: clamp(16px, 3vw, 56px);
+  padding-inline: var(--gut);
   padding-block: 0 56px;
 }
-.wrap { max-width: 980px; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; padding-top: 20px; }
+.wrap { max-width: none; width: 100%; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; padding-top: 20px; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; text-wrap: balance; line-height: 1.02; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -213,8 +214,8 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .mut { color: var(--ink-2); }
 
 /* Top bar */
-.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bar); border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 16px; }
-.bar-in { max-width: 980px; margin-inline: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; padding-block: 8px; }
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bar); border-bottom: 1px solid var(--line); margin-inline: calc(-1 * var(--gut)); padding-inline: var(--gut); }
+.bar-in { max-width: none; margin-inline: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; padding-block: 8px; }
 .brand { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; }
 .logo { flex: none; width: 42px; height: 42px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
 .brand-name { font-family: var(--f-display); font-weight: 700; font-size: 25px; line-height: 1.05; text-transform: uppercase; overflow-wrap: break-word; }
