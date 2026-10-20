@@ -484,6 +484,7 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .fbtn .ic-tri { flex: none; }
 .stnote-in { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 13px; width: 100%; }
 .stnote-in textarea { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; resize: vertical; }
+.eq-note { display: block; margin-top: 2px; }
 .stnote { display: block; margin-top: 2px; color: var(--ink-2); font-style: italic; white-space: pre-wrap; }
 .pen { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
 .pen input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
@@ -1535,7 +1536,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return '<div class="tablewrap"><table class="cls' + (pm ? ' sticky' : '') + '"><thead><tr>' + head + '</tr></thead><tbody>' + rows.map(function (x) {
       var ok = x.status === 'ok', first = ok && x.pos === 1, p = (pm && pm[x.d.id]) || {}, tot = 0, ab = !!r && absent(r, x.d.id);
       var cells = pc.map(function (k) { tot += p[k] || 0; return '<td class="num pcol">' + (p[k] ? p[k] : '–') + '</td>'; }).join('');
-      return '<tr' + (ab ? ' class="abs"' : '') + '><td class="posc c-pos' + (first ? ' p1' : '') + '">' + (ok ? posCell(x.pos, mv ? mv[x.d.id] : undefined) : '–') + '</td><td class="c-drv">' + drvCell(x.d) + (ab ? '<small class="mut abs-note">Non partecipa al campionato' + (pm ? ': punti non assegnati' : '') + '</small>' : '') + (sid && r && noteOf(s, r.id, sid, x.d.id) ? '<small class="stnote">Nota: ' + esc(noteOf(s, r.id, sid, x.d.id)) + '</small>' : '') + '</td>' +
+      return '<tr' + (ab ? ' class="abs"' : '') + '><td class="posc c-pos' + (first ? ' p1' : '') + '">' + (ok ? posCell(x.pos, mv ? mv[x.d.id] : undefined) : '–') + '</td><td class="c-drv">' + drvCell(x.d) + (r ? eqTag(r, x.d) : '') + (ab ? '<small class="mut abs-note">Non partecipa al campionato' + (pm ? ': punti non assegnati' : '') + '</small>' : '') + (sid && r && noteOf(s, r.id, sid, x.d.id) ? '<small class="stnote">Nota: ' + esc(noteOf(s, r.id, sid, x.d.id)) + '</small>' : '') + '</td>' +
         '<td class="num' + (x.status === 'R' ? ' dnf' : '') + '">' + (ok ? fmtTime(x.total) + (x.pen ? ' <small class="penb" title="Penalità incluse nel tempo">+' + fmtPen(x.pen) + ' pen.</small>' : '') + (x.rit ? ' <small title="Ritiro: tempo del primo + 10 minuti">RIT</small>' : '') : (x.status === 'R' ? 'RIT' : '–')) + '</td>' +
         '<td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.gap)) : '') + '</td><td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.prev)) : '') + '</td>' +
         cells + (pm ? '<td class="num pts tot">' + tot + '</td>' : '') + '</tr>';
@@ -1773,7 +1774,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
       var id = 'tm-' + sel.id + '-' + d.id, ty = 'ty-' + sel.id + '-' + d.id, rec = tyreRec(s, r.id, sel.id, d.id);
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
-      return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
+      return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + eqTag(r, d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
         '<td class="num"><label class="sr" for="' + id + '">Tempo di ' + esc(d.name) + '</label><div class="tmwrap"><input type="text" class="tm" id="' + id + '" value="' + esc(timeText(T[d.id])) + '" placeholder="00:00.000" inputmode="numeric" enterkeyhint="next" autocomplete="off" autocapitalize="characters" spellcheck="false" data-change="time" data-stage="' + sel.id + '" data-driver="' + d.id + '"><button class="btn small ghost" type="button" data-action="time-rit" data-for="' + id + '" aria-label="Segna ritiro per ' + esc(d.name) + '">RIT</button></div></td></tr>' +
         '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div>' + penHtml(s, r, sel, d) + noteHtml(s, r, sel, d) + '</div></td></tr>';
     }).join('') + '</tbody></table></div>';
@@ -2062,6 +2063,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   // Nome equivalente di un pilota in un evento (se l'evento non ha ancora i suoi, vale il vecchio nome unico del pilota)
   function eqOf(r, d) { return r && r.equiv ? (r.equiv[d.id] || '') : (d.equiv || ''); }
+  function eqTag(r, d) { var n = eqOf(r, d); return n ? '<small class="mut eq-note">Equivalente: ' + esc(n) + '</small>' : ''; }
   function eqRally(s) {
     var sr = sortedRallies(s);
     return sr.filter(function (r) { return r.id === ui.eqRally; })[0] || nextRally(s) || sr[0] || null;
