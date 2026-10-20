@@ -478,6 +478,9 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .wb[aria-pressed="true"] i { opacity: 1; }
 .wb:disabled { opacity: .3; cursor: not-allowed; }
 .wb.w0 { --wc: #2fbf71; } .wb.w1 { --wc: #f2c230; } .wb.w2 { --wc: #e5484d; }
+.stnote-in { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 13px; width: 100%; }
+.stnote-in textarea { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; resize: vertical; }
+.stnote { display: block; margin-top: 2px; color: var(--ink-2); font-style: italic; white-space: pre-wrap; }
 .pen { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
 .pen input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
 .penb { color: #b3261e; font-weight: 600; }
@@ -1519,7 +1522,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return m;
   }
   var SHORT = { arr: 'Arrivo', shd: 'SHD', sat: 'Sab', sun: 'Dom', ps: 'PS' };
-  function clsTable(s, rows, pm, mv, r) {
+  function clsTable(s, rows, pm, mv, r, sid) {
     if (!rows.length) return '<p class="hint">Nessun tempo inserito.</p>';
     var pc = [];
     if (pm) pc = ['arr', 'shd', 'sat', 'sun', 'ps'].filter(function (k) { return k === 'arr' || (s[{ shd: 'shdPoints', sat: 'satPoints', sun: 'sunPoints', ps: 'psPoints' }[k]] || []).length; });
@@ -1528,7 +1531,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return '<div class="tablewrap"><table class="cls' + (pm ? ' sticky' : '') + '"><thead><tr>' + head + '</tr></thead><tbody>' + rows.map(function (x) {
       var ok = x.status === 'ok', first = ok && x.pos === 1, p = (pm && pm[x.d.id]) || {}, tot = 0, ab = !!r && absent(r, x.d.id);
       var cells = pc.map(function (k) { tot += p[k] || 0; return '<td class="num pcol">' + (p[k] ? p[k] : '–') + '</td>'; }).join('');
-      return '<tr' + (ab ? ' class="abs"' : '') + '><td class="posc c-pos' + (first ? ' p1' : '') + '">' + (ok ? posCell(x.pos, mv ? mv[x.d.id] : undefined) : '–') + '</td><td class="c-drv">' + drvCell(x.d) + (ab ? '<small class="mut abs-note">Non partecipa al campionato' + (pm ? ': punti non assegnati' : '') + '</small>' : '') + '</td>' +
+      return '<tr' + (ab ? ' class="abs"' : '') + '><td class="posc c-pos' + (first ? ' p1' : '') + '">' + (ok ? posCell(x.pos, mv ? mv[x.d.id] : undefined) : '–') + '</td><td class="c-drv">' + drvCell(x.d) + (ab ? '<small class="mut abs-note">Non partecipa al campionato' + (pm ? ': punti non assegnati' : '') + '</small>' : '') + (sid && r && noteOf(s, r.id, sid, x.d.id) ? '<small class="stnote">Nota: ' + esc(noteOf(s, r.id, sid, x.d.id)) + '</small>' : '') + '</td>' +
         '<td class="num' + (x.status === 'R' ? ' dnf' : '') + '">' + (ok ? fmtTime(x.total) + (x.pen ? ' <small class="penb" title="Penalità incluse nel tempo">+' + fmtPen(x.pen) + ' pen.</small>' : '') + (x.rit ? ' <small title="Ritiro: tempo del primo + 10 minuti">RIT</small>' : '') : (x.status === 'R' ? 'RIT' : '–')) + '</td>' +
         '<td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.gap)) : '') + '</td><td class="num mut">' + (ok ? (first ? '–' : fmtGap(x.prev)) : '') + '</td>' +
         cells + (pm ? '<td class="num pts tot">' + tot + '</td>' : '') + '</tr>';
@@ -1551,10 +1554,10 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var mvs = ui.cls === 'prova' ? null : movesOf(s, r, ids, prevIdsFor(s, r, sel, ui.cls === 'giorno'));
     if (ui.cls === 'generale') {
       var last = ordered(r); last = last[last.length - 1];
-      return out + clsTable(s, classify(s, r, ids), pointsAt(s, r, sel), mvs, r) +
+      return out + clsTable(s, classify(s, r, ids), pointsAt(s, r, sel), mvs, r, sel.id) +
         '<p class="hint">' + (sel.id === last.id && evStatus(s, r) === 'done' ? 'Classifica finale: i punti sono quelli assegnati al campionato.' : 'Punti provvisori: sono quelli che verrebbero assegnati se l’evento finisse dopo questa tappa.') + '</p>';
     }
-    return out + clsTable(s, classify(s, r, ids, ui.cls === 'prova'), null, mvs, r) + (mvs ? '<p class="hint">Le frecce indicano le posizioni guadagnate o perse rispetto alla tappa precedente.</p>' : '');
+    return out + clsTable(s, classify(s, r, ids, ui.cls === 'prova'), null, mvs, r, sel.id) + (mvs ? '<p class="hint">Le frecce indicano le posizioni guadagnate o perse rispetto alla tappa precedente.</p>' : '');
   }
   function finalHtml(s, r) {
     if (!r.tappe.length) return '';
@@ -1768,8 +1771,13 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
       return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
         '<td class="num"><label class="sr" for="' + id + '">Tempo di ' + esc(d.name) + '</label><div class="tmwrap"><input type="text" class="tm" id="' + id + '" value="' + esc(timeText(T[d.id])) + '" placeholder="00:00.000" inputmode="numeric" enterkeyhint="next" autocomplete="off" autocapitalize="characters" spellcheck="false" data-change="time" data-stage="' + sel.id + '" data-driver="' + d.id + '"><button class="btn small ghost" type="button" data-action="time-rit" data-for="' + id + '" aria-label="Segna ritiro per ' + esc(d.name) + '">RIT</button></div></td></tr>' +
-        '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div>' + penHtml(s, r, sel, d) + '</div></td></tr>';
+        '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div>' + penHtml(s, r, sel, d) + noteHtml(s, r, sel, d) + '</div></td></tr>';
     }).join('') + '</tbody></table></div>';
+  }
+  function noteOf(s, rid, sid, did) { var m = s.results[rid] && s.results[rid].note, v = m && m[sid] && m[sid][did]; return typeof v === 'string' ? v : ''; }
+  function noteHtml(s, r, sel, d) {
+    var v = noteOf(s, r.id, sel.id, d.id), id = 'nt-' + sel.id + '-' + d.id;
+    return '<div class="stnote-in"><label for="' + id + '">Nota</label><textarea id="' + id + '" rows="1" maxlength="500" placeholder="Aggiungi una nota (facoltativa)" data-change="stnote" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + esc(v) + '</textarea></div>';
   }
   function penHtml(s, r, sel, d) {
     var v = penOf(s, r.id, sel.id, d.id), id = 'pn-' + sel.id + '-' + d.id;
@@ -2770,7 +2778,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     if (r.times) Object.keys(r.times).forEach(function (k) { if (!Object.keys(r.times[k]).length) delete r.times[k]; });
     if (r.tyres) Object.keys(r.tyres).forEach(function (k) { if (!Object.keys(r.tyres[k]).length) delete r.tyres[k]; });
     if (r.pen) Object.keys(r.pen).forEach(function (k) { if (!Object.keys(r.pen[k]).length) delete r.pen[k]; });
-    if (RES_KEYS.concat(['times', 'tyres', 'pen']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
+    if (r.note) Object.keys(r.note).forEach(function (k) { if (!Object.keys(r.note[k]).length) delete r.note[k]; });
+    if (RES_KEYS.concat(['times', 'tyres', 'pen', 'note']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
   }
 
 
@@ -3046,6 +3055,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (state.results[r.id] && state.results[r.id].times) delete state.results[r.id].times[id];
       if (state.results[r.id] && state.results[r.id].tyres) delete state.results[r.id].tyres[id];
       if (state.results[r.id] && state.results[r.id].pen) delete state.results[r.id].pen[id];
+      if (state.results[r.id] && state.results[r.id].note) delete state.results[r.id].note[id];
       cleanup(r.id); ui.stage = null; ui.editStage = null;
       commit(); toast('Tappa eliminata');
     },
@@ -3067,6 +3077,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
           if (r.times) Object.keys(r.times).forEach(function (sid) { delete r.times[sid][id]; });
           if (r.tyres) Object.keys(r.tyres).forEach(function (sid) { delete r.tyres[sid][id]; });
           if (r.pen) Object.keys(r.pen).forEach(function (sid) { delete r.pen[sid][id]; });
+          if (r.note) Object.keys(r.note).forEach(function (sid) { delete r.note[sid][id]; });
           cleanup(rid);
         });
       }
@@ -3298,6 +3309,15 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       cleanup(rid);
       el.value = v ? fmtTimeShort(v) : '';
       refreshEvent();
+    },
+    stnote: function (el) {
+      var rid = ui.manage, sid = el.dataset.stage, did = el.dataset.driver, v = el.value.trim();
+      var res = state.results[rid] = state.results[rid] || { pos: {} };
+      res.note = res.note || {};
+      var m = res.note[sid] = res.note[sid] || {};
+      if (!v) delete m[did]; else m[did] = v;
+      cleanup(rid);
+      lastJson = JSON.stringify(state); flush();
     },
     hf: function (el) { ui.hf = el.value; render(); },
     tyre: function (el) {
