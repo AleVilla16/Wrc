@@ -478,6 +478,10 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .wb[aria-pressed="true"] i { opacity: 1; }
 .wb:disabled { opacity: .3; cursor: not-allowed; }
 .wb.w0 { --wc: #2fbf71; } .wb.w1 { --wc: #f2c230; } .wb.w2 { --wc: #e5484d; }
+.fbtn { display: inline-flex; margin-top: 6px; }
+.fbtn .btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; }
+.fbtn .ic-emoji { font-size: 16px; line-height: 1; }
+.fbtn .ic-tri { flex: none; }
 .stnote-in { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 13px; width: 100%; }
 .stnote-in textarea { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; resize: vertical; }
 .stnote { display: block; margin-top: 2px; color: var(--ink-2); font-style: italic; white-space: pre-wrap; }
@@ -1775,12 +1779,18 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     }).join('') + '</tbody></table></div>';
   }
   function noteOf(s, rid, sid, did) { var m = s.results[rid] && s.results[rid].note, v = m && m[sid] && m[sid][did]; return typeof v === 'string' ? v : ''; }
-  function noteHtml(s, r, sel, d) {
+  function fieldBtn(kind, sel, d, label, icon) {
+    return '<div class="fbtn"><button type="button" class="btn small ghost fb-' + kind + '" data-action="open-field" data-kind="' + kind + '" data-stage="' + sel.id + '" data-driver="' + d.id + '" aria-label="' + label + ' di ' + esc(d.name) + '" title="' + label + '">' + icon + '<span>' + label + '</span></button></div>';
+  }
+  var TRI_ICON = '<svg class="ic-tri" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 2.6 22.4 20.6H1.6z" fill="#d32f2f" stroke="#d32f2f" stroke-width="1.6" stroke-linejoin="round"/><rect x="11" y="9" width="2" height="6" rx="1" fill="#fff"/><circle cx="12" cy="17.6" r="1.2" fill="#fff"/></svg>';
+  function noteHtml(s, r, sel, d, open) {
     var v = noteOf(s, r.id, sel.id, d.id), id = 'nt-' + sel.id + '-' + d.id;
+    if (!v && !open) return fieldBtn('note', sel, d, 'Nota', '<span class="ic-emoji" aria-hidden="true">📝</span>');
     return '<div class="stnote-in"><label for="' + id + '">Nota</label><textarea id="' + id + '" rows="1" maxlength="500" placeholder="Aggiungi una nota (facoltativa)" data-change="stnote" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + esc(v) + '</textarea></div>';
   }
-  function penHtml(s, r, sel, d) {
+  function penHtml(s, r, sel, d, open) {
     var v = penOf(s, r.id, sel.id, d.id), id = 'pn-' + sel.id + '-' + d.id;
+    if (!v && !open) return fieldBtn('pen', sel, d, 'Penalità', TRI_ICON);
     return '<div class="pen"><label for="' + id + '">Penalità</label><input type="text" class="pn" id="' + id + '" value="' + (v ? esc(fmtTimeShort(v)) : '') + '" placeholder="0 (es. 10 oppure 1:05.5)" inputmode="decimal" autocomplete="off" spellcheck="false" data-change="pen" data-stage="' + sel.id + '" data-driver="' + d.id + '"><span class="mut">sec</span></div>';
   }
   function fmtTimeShort(ms) { return ms < 60000 ? String(ms / 1000).replace('.', ',') : fmtTime(ms); }
@@ -3046,6 +3056,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     },
     'stage-up': function () { moveStage(-1); },
     'stage-down': function () { moveStage(1); },
+    'open-field': function (el) {
+      var r = findRally(state, ui.manage), sid = el.dataset.stage, did = el.dataset.driver;
+      var sel = r && r.tappe.filter(function (t) { return t.id === sid; })[0], d = state.drivers.filter(function (x) { return x.id === did; })[0];
+      if (!sel || !d) return;
+      var k = el.dataset.kind, wrap = el.closest('.fbtn'), tmp = document.createElement('div');
+      tmp.innerHTML = k === 'pen' ? penHtml(state, r, sel, d, true) : noteHtml(state, r, sel, d, true);
+      var nu = tmp.firstElementChild;
+      wrap.replaceWith(nu);
+      var inp = nu.querySelector('input,textarea'); if (inp) inp.focus();
+    },
     'toggle-add-stages': function () { var r = findRally(state, ui.manage); if (r && r.locked) return; ui.addStages = !ui.addStages; render(); },
     'edit-stage': function (el) { var r = findRally(state, ui.manage); if (r && r.locked) return; ui.editStage = el.dataset.id; render(); },
     'del-stage': function (el) {
@@ -3645,6 +3665,19 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   document.addEventListener('change', function (e) {
     var el = e.target.closest('[data-change]');
     if (el && changes[el.dataset.change]) changes[el.dataset.change](el, e);
+  });
+  document.addEventListener('focusout', function (e) {
+    var el = e.target;
+    if (!el || !el.matches || !el.matches('input.pn[data-change="pen"], textarea[data-change="stnote"]')) return;
+    setTimeout(function () {
+      if (!el.isConnected || document.activeElement === el || el.value.trim()) return;
+      var r = findRally(state, ui.manage), sid = el.dataset.stage, did = el.dataset.driver;
+      var sel = r && r.tappe.filter(function (t) { return t.id === sid; })[0], d = state.drivers.filter(function (x) { return x.id === did; })[0];
+      if (!sel || !d) return;
+      var isPen = el.dataset.change === 'pen', wrap = el.closest(isPen ? '.pen' : '.stnote-in'), tmp = document.createElement('div');
+      tmp.innerHTML = isPen ? penHtml(state, r, sel, d) : noteHtml(state, r, sel, d);
+      if (wrap && tmp.firstElementChild) wrap.replaceWith(tmp.firstElementChild);
+    }, 0);
   });
   document.addEventListener('input', function (e) {
     var el = e.target;
