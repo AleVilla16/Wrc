@@ -222,6 +222,12 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-me { display: grid; grid-template-columns: auto minmax(0, 260px); gap: 6px 10px; align-items: center; }
 .tel-me label { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .tel-me .hint { grid-column: 1 / -1; }
+.tel-charts { display: flex; flex-direction: column; gap: 14px; }
+.tel-chead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.tel-chead h5 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); display: inline-flex; align-items: center; gap: 8px; }
+.tel-chead h5 i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.tel-chead span { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 15px; color: var(--ink); min-height: 1.4em; }
+.tel-cv { display: block; width: 100%; height: 150px; touch-action: pan-y; cursor: crosshair; }
 .tel-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: stretch; }
 .tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
 .tel-ped .tel-lbl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
@@ -1827,13 +1833,14 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     }).catch(function () { /* funzione non disponibile: resta nascosta */ });
   }
   /* ---------- Telemetria in diretta via WebSocket ---------- */
-  var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, raf: 0, want: false, retry: 0 };
+  var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, len: null, raf: 0, want: false, retry: 0, tr: { mode: 'd', pts: [] }, hover: null };
   try { tel.url = localStorage.getItem('rally-tel-url') || ''; tel.unit = localStorage.getItem('rally-tel-unit') === 'km' ? 'km' : 'm'; tel.me = localStorage.getItem('rally-tel-me') || ''; } catch (e) { /* ignora */ }
   var TEL_KEYS = {
     thr: ['throttle', 'vehiclethrottle', 'throttleinput', 'gas', 'accelerator', 'acceleratore', 'accel'],
     brk: ['brake', 'vehiclebrake', 'brakeinput', 'freno'],
     dist: ['stagecurrentdistance', 'stagedistance', 'lapdistance', 'distance', 'distancetravelled', 'distancetraveled', 'distanza', 'km'],
     prog: ['stageprogress', 'progress', 'normalizedlapdistance', 'lapprogress', 'progresso'],
+    len: ['stagelength', 'tracklength', 'stagetotaldistance', 'stagedistancetotal', 'lengthofstage', 'lunghezzatappa', 'lunghezza', 'length'],
     fin: ['stagefinished', 'finished', 'isfinished', 'stagecomplete', 'stagecompleted', 'completed', 'finito', 'arrivato'],
     ftime: ['stageresulttime', 'finaltime', 'stagefinaltime', 'resulttime', 'tempofinale'],
     time: ['stagecurrenttime', 'stagetime', 'currenttime', 'laptime', 'totaltime', 'time', 'tempo'],
@@ -1856,14 +1863,18 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       '<div class="tel-ped"><div class="tel-lbl"><span>Acceleratore</span><b id="tel-thr-v">0%</b></div><div class="tel-track tel-thr"><span id="tel-thr"></span></div></div>' +
       '<div class="tel-ped"><div class="tel-lbl"><span>Freno</span><b id="tel-brk-v">0%</b></div><div class="tel-track tel-brk"><span id="tel-brk"></span></div></div></div>' +
       '<div class="tel-dist"><span class="tel-cap">Tappa</span><div class="tel-vbar" id="tel-bar-box" role="progressbar" aria-label="Km percorsi nella tappa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="tel-bar"></span></div><div class="tel-km" id="tel-km">–</div></div></div>' +
-      (km ? '' : '<p class="hint">Questa tappa non ha i km: inseriscili con «Modifica tappa» per vedere l’avanzamento rispetto alla lunghezza prevista.</p>') + '</div>';
+      '<div class="tel-charts">' + [['t', 'Acceleratore', '--good'], ['b', 'Pressione freno', '--bad']].map(function (c) {
+        return '<div><div class="tel-chead"><h5><i style="background:var(' + c[2] + ')"></i>' + c[1] + ' (%) sulla distanza</h5><span id="tel-c' + c[0] + '-v"></span></div><canvas class="tel-cv" id="tel-c' + c[0] + '" data-k="' + c[0] + '" role="img" aria-label="Grafico: ' + c[1] + ' in percentuale lungo la distanza della tappa"></canvas></div>';
+      }).join('') + '<div class="actions"><button class="btn small ghost" type="button" data-action="tel-clear">Azzera grafici</button></div></div>' +
+      '<p class="hint">La lunghezza della tappa arriva dalla telemetria' + (km ? '; finché non arriva vale quella scritta nella tappa (' + esc(fmtKm(km)) + ').' : '.') + '</p>' + (km ? '' : '<p class="hint" id="tel-nokm">In attesa della lunghezza della tappa dalla telemetria: finché non arriva la barra non può mostrare l’avanzamento.</p>') + '</div>';
   }
   function telNum(v) { return Math.round(v * 100) / 100; }
   function telPaint() {
     tel.raf = 0;
     var box = document.getElementById('tel-area');
     if (!box) return;
-    var km = Number(box.dataset.km) || 0, t = Math.round(tel.thr * 100), b = Math.round(tel.brk * 100);
+    var km = tel.len ? (tel.unit === 'km' ? tel.len : tel.len / 1000) : (Number(box.dataset.km) || 0), t = Math.round(tel.thr * 100), b = Math.round(tel.brk * 100);
+    var nk = document.getElementById('tel-nokm'); if (nk) nk.hidden = !!km;
     var e1 = document.getElementById('tel-thr'), e2 = document.getElementById('tel-brk');
     e1.style.transform = 'scaleX(' + tel.thr + ')'; e2.style.transform = 'scaleX(' + tel.brk + ')';
     document.getElementById('tel-thr-v').textContent = t + '%';
@@ -1875,7 +1886,73 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     document.getElementById('tel-bar-box').setAttribute('aria-valuenow', Math.round(frac * 100));
     document.getElementById('tel-km').innerHTML = done === null ? (km ? '– / ' + telNum(km) + ' km' : '–') :
       '<b>' + telNum(Math.max(0, done)).toFixed(2) + '</b>' + (km ? '<br>di ' + telNum(km) + ' km<br>' + Math.round(frac * 100) + '%' : ' km');
+    telCharts(km);
   }
+  // Traccia registrata: un punto ogni 2 metri circa; se la distanza torna indietro (nuova partenza) riparte da zero
+  function telSample() {
+    var mode = tel.dist !== null ? 'd' : (tel.prog !== null ? 'p' : ''), x = mode === 'd' ? tel.dist : tel.prog, tr = tel.tr;
+    if (!mode || !isFinite(x) || x < 0) return;
+    var step = mode === 'p' ? 0.0005 : (tel.unit === 'km' ? 0.002 : 2), last = tr.pts[tr.pts.length - 1];
+    if (tr.mode !== mode || (last && x < last.x - step * 25)) { tr.mode = mode; tr.pts = []; last = null; }
+    if (last && x - last.x < step) { last.t = Math.max(last.t, tel.thr); last.b = Math.max(last.b, tel.brk); return; }
+    tr.pts.push({ x: x, t: tel.thr, b: tel.brk });
+    if (tr.pts.length > 30000) tr.pts = tr.pts.filter(function (p, i) { return i % 2 === 0; });
+  }
+  function telX(p, km) { return tel.tr.mode === 'p' ? p.x * (km || 100) : (tel.unit === 'km' ? p.x : p.x / 1000); }
+  function telCharts(km) {
+    var cs = getComputedStyle(document.documentElement), pts = tel.tr.pts;
+    var ink2 = cs.getPropertyValue('--ink-2').trim() || '#888', line = cs.getPropertyValue('--line').trim() || '#444', surf = cs.getPropertyValue('--bg').trim() || '#000';
+    var pctX = tel.tr.mode === 'p' && !km, maxX = km || (pctX ? 100 : 1);
+    if (!km && pts.length) maxX = Math.max(maxX, telX(pts[pts.length - 1], km));
+    var raw = maxX / 5, mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10)), tick = [1, 2, 5, 10].map(function (m) { return m * mag; }).filter(function (v) { return v >= raw; })[0];
+    // punto più vicino al cursore
+    var hp = null;
+    if (tel.hover !== null && pts.length) {
+      var hx = tel.hover * maxX, lo = 0, hi = pts.length - 1;
+      while (lo < hi) { var mid = (lo + hi) >> 1; if (telX(pts[mid], km) < hx) lo = mid + 1; else hi = mid; }
+      hp = lo > 0 && Math.abs(telX(pts[lo - 1], km) - hx) < Math.abs(telX(pts[lo], km) - hx) ? pts[lo - 1] : pts[lo];
+    }
+    [['t', '--good'], ['b', '--bad']].forEach(function (c) {
+      var cv = document.getElementById('tel-c' + c[0]), out = document.getElementById('tel-c' + c[0] + '-v');
+      if (!cv) return;
+      var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+      if (!w || !h) return;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      var g = cv.getContext('2d'), L = 38, R = 10, T = 8, B = 22, pw = w - L - R, ph = h - T - B, col = cs.getPropertyValue(c[1]).trim() || '#4cc38a';
+      function X(v) { return L + v / maxX * pw; }
+      function Y(v) { return T + (1 - v) * ph; }
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+      g.font = '13px "Barlow Condensed", "Arial Narrow", sans-serif'; g.fillStyle = ink2; g.strokeStyle = line; g.lineWidth = 1;
+      g.textAlign = 'right'; g.textBaseline = 'middle';
+      [0, .5, 1].forEach(function (v) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(Math.round(v * 100) + '%', L - 6, y); });
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      for (var v = 0; v <= maxX + 1e-9; v += tick) g.fillText(String(Math.round(v * 100) / 100).replace('.', ',') + (pctX ? '%' : ''), X(v), h - B + 6);
+      g.textAlign = 'right'; g.fillText(pctX ? '' : 'km', w - 2, h - B + 6);
+      if (pts.length) {
+        g.save(); g.beginPath(); g.rect(L, T - 2, pw, ph + 4); g.clip();
+        g.beginPath(); g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = 'round';
+        pts.forEach(function (p, i) { var x = X(telX(p, km)), y = Y(p[c[0]]); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
+        g.stroke(); g.restore();
+      } else { g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('In attesa dei dati della telemetria', L + pw / 2, T + ph / 2); }
+      if (hp) {
+        var px = X(telX(hp, km)), py = Y(hp[c[0]]);
+        g.strokeStyle = ink2; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(px) + .5, T); g.lineTo(Math.round(px) + .5, T + ph); g.stroke();
+        g.beginPath(); g.arc(px, py, 6, 0, Math.PI * 2); g.fillStyle = surf; g.fill();
+        g.beginPath(); g.arc(px, py, 4, 0, Math.PI * 2); g.fillStyle = col; g.fill();
+      }
+      var show = hp || pts[pts.length - 1];
+      if (out) out.textContent = show ? (pctX ? telNum(telX(show, km)).toFixed(1).replace('.', ',') + '% della tappa' : telNum(telX(show, km)).toFixed(2).replace('.', ',') + ' km') + ' · ' + Math.round(show[c[0]] * 100) + '%' : '';
+    });
+  }
+  function telHover(e) {
+    var cv = e.target && e.target.classList && e.target.classList.contains('tel-cv') ? e.target : null, v = null;
+    if (cv && e.type !== 'pointerleave' && e.type !== 'pointerout') { var bx = cv.getBoundingClientRect(); v = Math.max(0, Math.min(1, (e.clientX - bx.left - 38) / (bx.width - 48))); }
+    if (v !== tel.hover) { tel.hover = v; telQueue(); }
+  }
+  document.addEventListener('pointermove', telHover);
+  document.addEventListener('pointerdown', telHover);
+  document.addEventListener('pointerout', function (e) { if (tel.hover !== null && e.target && e.target.classList && e.target.classList.contains('tel-cv')) { tel.hover = null; telQueue(); } });
+  window.addEventListener('resize', function () { telQueue(); });
   function telQueue() { if (!tel.raf) tel.raf = requestAnimationFrame(telPaint); }
   function telStatus(st, msg) {
     tel.st = st; tel.msg = msg || '';
@@ -1957,13 +2034,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if ((v = telPick(f, TEL_KEYS.thr)) !== null) tel.thr = telPedal(v);
       if ((v = telPick(f, TEL_KEYS.brk)) !== null) tel.brk = telPedal(v);
       if ((v = telPick(f, TEL_KEYS.dist)) !== null) tel.dist = v;
+      if ((v = telPick(f, TEL_KEYS.len)) !== null && v > 0) tel.len = v;
       if ((v = telPick(f, TEL_KEYS.prog)) !== null) tel.prog = Math.max(0, Math.min(1, v > 1 ? v / 100 : v));
       try { telFinish(o, f); } catch (e) { /* un messaggio strano non deve fermare la telemetria */ }
     } else if (data instanceof ArrayBuffer && data.byteLength >= 128 && data.byteLength % 4 === 0) {
       // Pacchetto UDP in formato Codemasters (DiRT Rally / DiRT Rally 2.0) inoltrato così com'è
       var dv = new DataView(data);
       tel.dist = dv.getFloat32(8, true); tel.thr = telPedal(dv.getFloat32(116, true)); tel.brk = telPedal(dv.getFloat32(124, true));
+      if (data.byteLength >= 248) { var tl = dv.getFloat32(244, true); if (isFinite(tl) && tl > 0) tel.len = tl; }
     } else return;
+    telSample();
     telQueue();
   }
   function telOpen() {
@@ -1987,7 +2067,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     tel.want = false; clearTimeout(tel.retry);
     var ws = tel.ws; tel.ws = null;
     if (ws) { try { ws.close(); } catch (e) { /* ignora */ } }
-    tel.thr = 0; tel.brk = 0; tel.dist = null; tel.prog = null;
+    tel.thr = 0; tel.brk = 0; tel.dist = null; tel.prog = null; tel.len = null;
     telStatus('off');
   }
 
@@ -2954,7 +3034,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   // Evento di una stagione archiviata: si può solo sfogliare (tappe, classifiche, gomme), niente modifiche
   function arcOn() { return !!ui.manageArc && (ui.tab === 'storico-eventi' || ui.tab === 'storico-campionati'); }
   function lockArchiveView() {
-    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect'];
+    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect', 'tel-clear'];
     var drop = ['lock', 'toggle-add-stages', 'edit-stage', 'del-stage', 'time-rit', 'gm-add', 'gm-del', 'gm-copy', 'clear-results', 'edit-cancel', 'sa-row', 'sa-row-del'];
     Array.prototype.forEach.call($app.querySelectorAll('[data-action]'), function (b) {
       var a = b.getAttribute('data-action');
@@ -3252,6 +3332,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       tel.want = true; telOpen(); render();
     },
     'tel-disconnect': function () { telClose(); render(); },
+    'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
       if (!inp) return;
