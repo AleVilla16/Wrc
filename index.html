@@ -2114,14 +2114,25 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   function telParts(km) { return !km ? 0 : km < 10 ? 4 : km <= 15 ? 6 : km <= 20 ? 8 : 10; }
   function telKm() { var box = document.getElementById('tel-area'); return tel.len ? (tel.unit === 'km' ? tel.len : tel.len / 1000) : (box ? Number(box.dataset.km) || 0 : 0); }
+  // Punti in cui suonare: metà (1 bip), ultimo segno (2), penultimo se la tappa supera i 15 km (3), quello prima se supera i 20 km (4)
+  function telCueList(parts) {
+    var list = [{ id: 'mid', f: 0.5, n: 1 }];
+    if (parts) list.push({ id: 'last', f: (parts - 1) / parts, n: 2 });
+    if (parts >= 8) list.push({ id: 'pen', f: (parts - 2) / parts, n: 3 });
+    if (parts >= 10) list.push({ id: 'pre', f: (parts - 3) / parts, n: 4 });
+    return list;
+  }
   function telCues() {
     var km = telKm(), f = tel.dist !== null ? (km ? (tel.unit === 'km' ? tel.dist : tel.dist / 1000) / km : null) : tel.prog;
     if (f === null || !isFinite(f)) return;
-    var prev = tel.pf, parts = telParts(km), last = parts ? (parts - 1) / parts : null;
+    var prev = tel.pf, list = telCueList(telParts(km));
     tel.pf = f;
-    if (prev === null || f < prev - 0.05 || f < 0.02) { tel.bz = { mid: f >= 0.5, last: last !== null && f >= last }; return; }   // partenza o nuova prova: riarma
-    if (!tel.bz.mid && prev < 0.5 && f >= 0.5) { tel.bz.mid = true; telBeep(1); }
-    if (last !== null && !tel.bz.last && prev < last && f >= last && f < 1.02) { tel.bz.last = true; telBeep(2); }
+    if (prev === null || f < prev - 0.05 || f < 0.02) {   // partenza o nuova prova: riarma
+      tel.bz = {}; list.forEach(function (c) { tel.bz[c.id] = f >= c.f; });
+      return;
+    }
+    if (f >= 1.02) return;
+    list.forEach(function (c) { if (!tel.bz[c.id] && prev < c.f && f >= c.f) { tel.bz[c.id] = true; telBeep(c.n); } });
   }
   function telQueue() { if (!tel.raf) tel.raf = requestAnimationFrame(telPaint); }
   function telStatus(st, msg) {
@@ -3671,7 +3682,9 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       tel.want = true; telOpen(); render();
     },
     'tel-disconnect': function () { telClose(); render(); },
-    'tel-test': function () { var was = tel.snd; tel.snd = true; telBeep(1); setTimeout(function () { telBeep(2); tel.snd = was; }, 700); },
+    'tel-test': function () {   // fa sentire in fila i quattro segnali: 1, 2, 3 e 4 bip
+      [1, 2, 3, 4].forEach(function (n, i) { setTimeout(function () { var was = tel.snd; tel.snd = true; telBeep(n); tel.snd = was; }, [0, 700, 1600, 2700][i]); });
+    },
     'tel-raw-show': function () { var e = document.getElementById('tel-raw-out'); if (e) e.textContent = telRawText(); },
     'tel-raw-copy': function () {
       var t = telRawText(), e = document.getElementById('tel-raw-out'); if (e) e.textContent = t;
