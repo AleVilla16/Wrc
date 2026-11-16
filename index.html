@@ -231,6 +231,7 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-leg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
 .tel-leg b, .tel-leg .tel-at { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3ch; }
 .tel-cv { display: block; width: 100%; height: 190px; touch-action: pan-y; cursor: crosshair; }
+.crew-sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
 .tel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 260px); gap: 18px; align-items: stretch; }
 @media (max-width: 760px) { .tel-body { grid-template-columns: minmax(0, 1fr); } }
 .tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
@@ -1852,23 +1853,50 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     ks.slice(40).forEach(function (k) { delete crewData[k]; });
     try { localStorage.setItem('rally-tel-crew', JSON.stringify(crewData)); } catch (e) { /* ignora */ }
   }
-  function crewLabel(k) { var t = String(k).replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); return t.charAt(0).toUpperCase() + t.slice(1); }
-  // Compare solo quando la tappa è finita, cioè quando la telemetria ha mandato i risultati di questa tappa
+  var CREW_LABELS = [
+    [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae])(type|tipo|compound|mescola|name|nome)$/, 'Tipo pneumatici'],
+    [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae])(colou?r|colore)$/, 'Colore pneumatici'],
+    [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae]|compound|mescola)$/, 'Pneumatici'],
+    [/^(colou?r|colore)$/, 'Colore'], [/^(car|vehicle|auto|vettura)(name)?$/, 'Auto'], [/^(class|classe|category|categoria)$/, 'Classe'],
+    [/^(gap|diff|difference|distacco|delta)$/, 'Distacco (classifica)'], [/^(penalty|penalties|penalita)$/, 'Penalità'],
+    [/^(codriver|navigator|navigatore)$/, 'Navigatore'], [/^(nationality|nation|country|nazione|nazionalita)$/, 'Nazione'], [/^(team|squadra)$/, 'Team'],
+    [/^(totaltime|overalltime|tempototale)$/, 'Tempo totale'], [/^(points|punti)$/, 'Punti'], [/^(status|stato)$/, 'Stato']
+  ];
+  var CREW_POS = /^(position|pos|posizione|rank|place|stageposition)$/;
+  var CREW_COLORS = { rosso: '#e5484d', red: '#e5484d', giallo: '#f5d90a', yellow: '#f5d90a', verde: '#46a758', green: '#46a758', bianco: '#f2f2f2', white: '#f2f2f2', blu: '#3e8ed0', blue: '#3e8ed0', azzurro: '#5eb0ef', nero: '#1c1c1c', black: '#1c1c1c', arancione: '#f76808', orange: '#f76808', viola: '#8e4ec6', purple: '#8e4ec6', grigio: '#8b8d98', gray: '#8b8d98', grey: '#8b8d98' };
+  function crewNorm(k) { return String(k).toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, ''); }
+  function crewLabel(k) {
+    var n = crewNorm(k);
+    for (var i = 0; i < CREW_LABELS.length; i++) if (CREW_LABELS[i][0].test(n)) return CREW_LABELS[i][1];
+    var t = String(k).replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function crewCell(k, v) {
+    if (v == null) return '–';
+    var c = /colou?r|colore/.test(crewNorm(k)) ? (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v) ? v : CREW_COLORS[crewNorm(v)]) : '';
+    return (c ? '<i class="crew-sw" style="background:' + c + '"></i>' : '') + esc(v);
+  }
+  // Compare solo quando la tappa è finita, cioè quando la telemetria ha mandato la classifica di questa tappa
   function crewHtml(r, sel) {
     var rec = crewData[r.id + '|' + sel.id];
     if (!rec || !rec.rows || !rec.rows.length) return '';
-    var rows = rec.rows.slice().sort(function (a, b) { return (a.v === 'R' ? Infinity : a.v) - (b.v === 'R' ? Infinity : b.v); });
-    var best = typeof rows[0].v === 'number' ? rows[0].v : null, cols = [];
-    rows.forEach(function (x) { Object.keys(x.ex || {}).forEach(function (k) { if (cols.indexOf(k) < 0 && cols.length < 6) cols.push(k); }); });
+    var rows = rec.rows.slice(), cols = [], posKey = {};
+    function posOf(x) { var ks = Object.keys(x.ex || {}); for (var i = 0; i < ks.length; i++) if (CREW_POS.test(crewNorm(ks[i]))) { var n = parseInt(x.ex[ks[i]], 10); if (isFinite(n)) { posKey[ks[i]] = 1; return n; } } return null; }
+    function tv(x) { return x.v === 'R' ? Infinity : (x.v === null ? 1e15 : x.v); }
+    var hasPos = rows.some(function (x) { return posOf(x) !== null; });
+    // ordine: quello della classifica ricevuta (posizione), altrimenti per tempo
+    if (hasPos) rows.sort(function (a, b) { var pa = posOf(a), pb = posOf(b); return (pa === null ? 1e9 : pa) - (pb === null ? 1e9 : pb) || tv(a) - tv(b); });
+    else rows.sort(function (a, b) { return tv(a) - tv(b); });
+    var times = rows.map(function (x) { return x.v; }).filter(function (v) { return typeof v === 'number'; }), best = times.length ? Math.min.apply(null, times) : null;
+    rows.forEach(function (x) { Object.keys(x.ex || {}).forEach(function (k) { if (!posKey[k] && cols.indexOf(k) < 0 && cols.length < 8) cols.push(k); }); });
     var byId = {}; state.drivers.forEach(function (d) { byId[d.id] = d; });
-    return '<div class="tel" id="crew-area"><div class="tel-head"><h4>Crew a fine tappa</h4><span class="hint">' + plural(rows.length, 'crew', 'crew') + ' · dati ricevuti dalla telemetria</span></div>' +
+    return '<div class="tel" id="crew-area"><div class="tel-head"><h4>Crew a fine tappa</h4><span class="hint">' + plural(rows.length, 'crew', 'crew') + ' · classifica ricevuta dalla telemetria</span></div>' +
       '<div class="tablewrap"><table class="cls"><thead><tr><th scope="col">#</th><th scope="col">Crew</th><th scope="col">Pilota abbinato</th><th class="num" scope="col">Tempo</th><th class="num" scope="col">Distacco</th>' +
       cols.map(function (k) { return '<th scope="col">' + esc(crewLabel(k)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       rows.map(function (x, i) {
-        var d = byId[x.did], out = x.v === 'R';
-        return '<tr><td class="num">' + (out ? '–' : i + 1) + '</td><td><b>' + esc(x.name) + '</b>' + (x.me ? ' <span class="tag acc">Tu</span>' : '') + '</td><td>' + (d ? esc(d.name) : '<span class="mut">non abbinato</span>') + '</td>' +
-          '<td class="num">' + (out ? 'RIT' : esc(fmtTime(x.v))) + '</td><td class="num">' + (out || best === null ? '–' : (x.v === best ? '—' : '+' + esc((x.v - best) < 60000 ? ((x.v - best) / 1000).toFixed(3).replace('.', ',') : fmtTime(x.v - best)))) + '</td>' +
-          cols.map(function (k) { return '<td>' + esc(x.ex && x.ex[k] != null ? x.ex[k] : '–') + '</td>'; }).join('') + '</tr>';
+        var d = byId[x.did], out = x.v === 'R', none = x.v === null, p = posOf(x);
+        return '<tr><td class="num">' + (p !== null ? p : (out ? '–' : i + 1)) + '</td><td><b>' + esc(x.name) + '</b>' + (x.me ? ' <span class="tag acc">Tu</span>' : '') + '</td><td>' + (d ? esc(d.name) : '<span class="mut">non abbinato</span>') + '</td>' +
+          '<td class="num">' + (out ? 'RIT' : none ? '–' : esc(fmtTime(x.v))) + '</td><td class="num">' + (out || none || best === null ? '–' : (x.v === best ? '—' : '+' + esc((x.v - best) < 60000 ? ((x.v - best) / 1000).toFixed(3).replace('.', ',') : fmtTime(x.v - best)))) + '</td>' +
+          cols.map(function (k) { return '<td>' + crewCell(k, x.ex ? x.ex[k] : null) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' +
       '<div class="actions"><button class="btn small ghost" type="button" data-action="crew-clear" data-key="' + esc(r.id + '|' + sel.id) + '">Nascondi</button></div></div>';
   }
@@ -1885,8 +1913,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     fin: ['stagefinished', 'finished', 'isfinished', 'stagecomplete', 'stagecompleted', 'completed', 'finito', 'arrivato'],
     ftime: ['stageresulttime', 'finaltime', 'stagefinaltime', 'resulttime', 'tempofinale'],
     time: ['stagecurrenttime', 'stagetime', 'currenttime', 'laptime', 'totaltime', 'time', 'tempo'],
-    name: ['name', 'drivername', 'driver', 'pilot', 'pilota', 'nome', 'player', 'playername'],
-    rtime: ['stageresulttime', 'finaltime', 'stagetime', 'totaltime', 'time', 'tempo', 'result'],
+    name: ['crew', 'crewname', 'equipaggio', 'name', 'drivername', 'driver', 'pilot', 'pilota', 'nome', 'player', 'playername'],
+    rtime: ['stageresulttime', 'finaltime', 'stagetime', 'time', 'tempo', 'result', 'totaltime'],
     dnf: ['dnf', 'retired', 'ritirato', 'ritiro']
   };
   function telStatusText() {
@@ -2077,13 +2105,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         var nm = telField(x, TEL_KEYS.name), dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
         if (typeof nm !== 'string' || !nm.trim()) return;
         var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : telMs(telField(x, TEL_KEYS.rtime));
-        if (out === null) return;
         var ex = {}, skip = TEL_KEYS.name.concat(TEL_KEYS.rtime, TEL_KEYS.dnf);
-        Object.keys(x).forEach(function (k) {
-          var val = x[k], kk = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (skip.indexOf(kk) >= 0 || val === null || val === '' || typeof val === 'object') return;
-          ex[k] = typeof val === 'boolean' ? (val ? 'Sì' : 'No') : String(val).slice(0, 40);
-        });
+        (function add(obj, pre, deep) {
+          Object.keys(obj).forEach(function (k) {
+            var val = obj[k], kk = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+            if ((!pre && skip.indexOf(kk) >= 0) || val === null || val === '') return;
+            if (typeof val === 'object') { if (deep < 1 && !Array.isArray(val)) add(val, pre + k + ' ', deep + 1); else if (Array.isArray(val) && val.every(function (q) { return typeof q !== 'object'; })) ex[pre + k] = val.join(', ').slice(0, 40); return; }
+            ex[pre + k] = typeof val === 'boolean' ? (val ? 'Sì' : 'No') : String(val).slice(0, 40);
+          });
+        })(x, '', 0);
+        if (out === null && !Object.keys(ex).length) return;
         rows.push({ name: nm, v: out, ex: ex });
       });
       return rows.length ? rows : null;
@@ -2121,7 +2152,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       var did = matchDriver(state, r, x.name);
       if (did && did === tel.me && mine !== null) { crew[0].ex = x.ex; crew[0].name = x.name; return; }   // la mia riga è già in elenco
       crew.push({ name: x.name, v: x.v, did: did || '', ex: x.ex });
-      if (did) put(did, x.v); else miss.push(x.name);
+      if (did) { if (x.v !== null) put(did, x.v); } else miss.push(x.name);
     });
     crewSave(r.id + '|' + sel.id, crew);
     if (n) { cleanup(r.id); commit(); } else setHtml('crew-wrap', crewHtml(r, sel));
