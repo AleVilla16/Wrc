@@ -112,7 +112,7 @@ body {
   padding-inline: 16px;
   padding-block: 0 56px;
 }
-.wrap { max-width: 980px; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; padding-top: 20px; }
+.wrap { max-width: none; margin-inline: auto; display: flex; flex-direction: column; gap: 22px; padding-top: 20px; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { font-family: var(--f-display); font-weight: 700; text-transform: uppercase; text-wrap: balance; line-height: 1.02; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -208,6 +208,34 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tmwrap { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .tmwrap .btn { min-height: 40px; padding-inline: 10px; }
 .kmtot { color: var(--accent-text); font-weight: 600; }
+.tel { border: 1px solid var(--line); border-radius: 14px; padding: 14px; background: var(--bg); display: flex; flex-direction: column; gap: 12px; margin-block: 12px; }
+.tel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.tel-head h4 { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: .1em; text-transform: uppercase; margin: 0; }
+.tel-st { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-2); }
+.tel-st i { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); flex: none; }
+.tel-st.on i { background: var(--good); }
+.tel-st.wait i { background: var(--warn); }
+.tel-st.err i { background: var(--bad); }
+.tel-conn { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.tel-conn select { width: auto; }
+@media (max-width: 560px) { .tel-conn { grid-template-columns: minmax(0, 1fr) auto; } .tel-conn input { grid-column: 1 / -1; } }
+.tel-me { display: grid; grid-template-columns: auto minmax(0, 260px); gap: 6px 10px; align-items: center; }
+.tel-me label { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.tel-me .hint { grid-column: 1 / -1; }
+.tel-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: stretch; }
+.tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
+.tel-ped .tel-lbl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.tel-ped .tel-lbl b { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 22px; letter-spacing: 0; color: var(--ink); }
+.tel-track { height: 22px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; margin-top: 4px; }
+.tel-track span { display: block; height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); }
+.tel-thr span { background: var(--good); }
+.tel-brk span { background: var(--bad); }
+.tel-dist { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
+.tel-vbar { flex: 1; min-height: 150px; width: 34px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; display: flex; align-items: flex-end; }
+.tel-vbar span { display: block; width: 100%; height: 100%; background: var(--good); transform-origin: center bottom; transform: scaleY(0); }
+.tel-dist .tel-cap { font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.tel-dist .tel-km { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 15px; text-align: center; line-height: 1.25; }
+.tel-dist .tel-km b { font-size: 20px; color: var(--good); }
 .filebtn { position: relative; overflow: hidden; }
 .filebtn .filein { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; font-size: 0; }
 .filebtn:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
@@ -216,7 +244,7 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 
 /* Top bar */
 .topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--bar); border-bottom: 1px solid var(--line); margin-inline: -16px; padding-inline: 16px; }
-.bar-in { max-width: 980px; margin-inline: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; padding-block: 8px; }
+.bar-in { max-width: none; margin-inline: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 0 16px; padding-block: 8px; }
 .brand { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; }
 .logo { flex: none; width: 42px; height: 42px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; }
 .brand-name { font-family: var(--f-display); font-weight: 700; font-size: 25px; line-height: 1.05; text-transform: uppercase; overflow-wrap: break-word; }
@@ -1798,13 +1826,178 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       });
     }).catch(function () { /* funzione non disponibile: resta nascosta */ });
   }
+  /* ---------- Telemetria in diretta via WebSocket ---------- */
+  var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, raf: 0, want: false, retry: 0 };
+  try { tel.url = localStorage.getItem('rally-tel-url') || ''; tel.unit = localStorage.getItem('rally-tel-unit') === 'km' ? 'km' : 'm'; tel.me = localStorage.getItem('rally-tel-me') || ''; } catch (e) { /* ignora */ }
+  var TEL_KEYS = {
+    thr: ['throttle', 'vehiclethrottle', 'throttleinput', 'gas', 'accelerator', 'acceleratore', 'accel'],
+    brk: ['brake', 'vehiclebrake', 'brakeinput', 'freno'],
+    dist: ['stagecurrentdistance', 'stagedistance', 'lapdistance', 'distance', 'distancetravelled', 'distancetraveled', 'distanza', 'km'],
+    prog: ['stageprogress', 'progress', 'normalizedlapdistance', 'lapprogress', 'progresso'],
+    fin: ['stagefinished', 'finished', 'isfinished', 'stagecomplete', 'stagecompleted', 'completed', 'finito', 'arrivato'],
+    ftime: ['stageresulttime', 'finaltime', 'stagefinaltime', 'resulttime', 'tempofinale'],
+    time: ['stagecurrenttime', 'stagetime', 'currenttime', 'laptime', 'totaltime', 'time', 'tempo'],
+    name: ['name', 'drivername', 'driver', 'pilot', 'pilota', 'nome', 'player', 'playername'],
+    rtime: ['stageresulttime', 'finaltime', 'stagetime', 'totaltime', 'time', 'tempo', 'result'],
+    dnf: ['dnf', 'retired', 'ritirato', 'ritiro']
+  };
+  function telStatusText() {
+    return tel.st === 'on' ? 'Collegata' : tel.st === 'wait' ? 'Collegamento…' : tel.st === 'err' ? (tel.msg || 'Errore di collegamento') : 'Non collegata';
+  }
+  function telHtml(sel) {
+    var km = Number(sel.km) || 0, live = tel.st === 'on' || tel.st === 'wait';
+    return '<div class="tel" id="tel-area" data-km="' + km + '"><div class="tel-head"><h4>Telemetria in diretta</h4><span class="tel-st ' + tel.st + '" id="tel-st" role="status"><i></i><span>' + esc(telStatusText()) + '</span></span></div>' +
+      '<div class="tel-conn"><label class="sr" for="tel-url">Indirizzo WebSocket della telemetria</label><input type="text" id="tel-url" value="' + esc(tel.url) + '" placeholder="ws://127.0.0.1:8080" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url"' + (live ? ' readonly' : '') + '>' +
+      '<label class="sr" for="tel-unit">Unità della distanza ricevuta</label><select id="tel-unit" data-change="tel-unit" title="Unità in cui la telemetria manda la distanza"><option value="m"' + (tel.unit === 'm' ? ' selected' : '') + '>Distanza in metri</option><option value="km"' + (tel.unit === 'km' ? ' selected' : '') + '>Distanza in km</option></select>' +
+      (live ? '<button class="btn" type="button" data-action="tel-disconnect">Scollega</button>' : '<button class="btn primary" type="button" data-action="tel-connect">Collega</button>') + '</div>' +
+      '<div class="tel-me"><label for="tel-me">Il mio pilota</label><select id="tel-me" data-change="tel-me"><option value="">— scegli —</option>' + (state && state.drivers ? state.drivers : []).map(function (d) { return '<option value="' + d.id + '"' + (d.id === tel.me ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select>' +
+      '<span class="hint">A fine speciale il tuo tempo va a questo pilota e quelli degli avversari ai piloti con lo stesso nome equivalente.</span></div>' +
+      '<div class="tel-body"><div class="tel-pedals">' +
+      '<div class="tel-ped"><div class="tel-lbl"><span>Acceleratore</span><b id="tel-thr-v">0%</b></div><div class="tel-track tel-thr"><span id="tel-thr"></span></div></div>' +
+      '<div class="tel-ped"><div class="tel-lbl"><span>Freno</span><b id="tel-brk-v">0%</b></div><div class="tel-track tel-brk"><span id="tel-brk"></span></div></div></div>' +
+      '<div class="tel-dist"><span class="tel-cap">Tappa</span><div class="tel-vbar" id="tel-bar-box" role="progressbar" aria-label="Km percorsi nella tappa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="tel-bar"></span></div><div class="tel-km" id="tel-km">–</div></div></div>' +
+      (km ? '' : '<p class="hint">Questa tappa non ha i km: inseriscili con «Modifica tappa» per vedere l’avanzamento rispetto alla lunghezza prevista.</p>') + '</div>';
+  }
+  function telNum(v) { return Math.round(v * 100) / 100; }
+  function telPaint() {
+    tel.raf = 0;
+    var box = document.getElementById('tel-area');
+    if (!box) return;
+    var km = Number(box.dataset.km) || 0, t = Math.round(tel.thr * 100), b = Math.round(tel.brk * 100);
+    var e1 = document.getElementById('tel-thr'), e2 = document.getElementById('tel-brk');
+    e1.style.transform = 'scaleX(' + tel.thr + ')'; e2.style.transform = 'scaleX(' + tel.brk + ')';
+    document.getElementById('tel-thr-v').textContent = t + '%';
+    document.getElementById('tel-brk-v').textContent = b + '%';
+    var done = tel.dist !== null ? (tel.unit === 'km' ? tel.dist : tel.dist / 1000) : (tel.prog !== null && km ? tel.prog * km : null);
+    var frac = km && done !== null ? done / km : (tel.prog !== null ? tel.prog : 0);
+    frac = Math.max(0, Math.min(1, frac));
+    document.getElementById('tel-bar').style.transform = 'scaleY(' + frac + ')';
+    document.getElementById('tel-bar-box').setAttribute('aria-valuenow', Math.round(frac * 100));
+    document.getElementById('tel-km').innerHTML = done === null ? (km ? '– / ' + telNum(km) + ' km' : '–') :
+      '<b>' + telNum(Math.max(0, done)).toFixed(2) + '</b>' + (km ? '<br>di ' + telNum(km) + ' km<br>' + Math.round(frac * 100) + '%' : ' km');
+  }
+  function telQueue() { if (!tel.raf) tel.raf = requestAnimationFrame(telPaint); }
+  function telStatus(st, msg) {
+    tel.st = st; tel.msg = msg || '';
+    var el = document.getElementById('tel-st');
+    if (el) { el.className = 'tel-st ' + st; el.lastChild.textContent = telStatusText(); }
+  }
+  // Pedali: accetta 0–1, 0–100 oppure 0–255
+  function telPedal(v) { v = Number(v); if (!isFinite(v)) return null; if (v > 100) v = v / 255; else if (v > 1) v = v / 100; return Math.max(0, Math.min(1, v)); }
+  function telFlat(o, out, depth) {
+    Object.keys(o).forEach(function (k) {
+      var v = o[k], key = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (v && typeof v === 'object') { if (depth < 3) telFlat(v, out, depth + 1); }
+      else if (!(key in out) && v !== '' && v !== null && isFinite(Number(v))) out[key] = Number(v);
+      else if (typeof v === 'string' && v && !(('$' + key) in out)) out['$' + key] = v;
+    });
+    return out;
+  }
+  // Tempo dalla telemetria in millisecondi: testo MM:SS.mmm, secondi (es. 205.123) oppure millisecondi
+  function telMs(v) {
+    if (typeof v === 'string') { var n = Number(v); if (v.trim() === '' || !isFinite(n)) { var t = parseTime(v); return typeof t === 'number' || t === 'R' ? t : null; } v = n; }
+    if (typeof v !== 'number' || !isFinite(v) || v <= 0) return null;
+    return Math.round(v >= 36000 ? v : v * 1000);
+  }
+  function telField(o, names) {
+    var keys = Object.keys(o), i, j;
+    for (i = 0; i < names.length; i++) for (j = 0; j < keys.length; j++) if (keys[j].toLowerCase().replace(/[^a-z0-9]/g, '') === names[i]) return o[keys[j]];
+    return undefined;
+  }
+  // Cerca nel messaggio un elenco di risultati: righe con un nome e un tempo (o un ritiro)
+  function telRows(o, depth) {
+    if (Array.isArray(o)) {
+      var rows = [];
+      o.forEach(function (x) {
+        if (!x || typeof x !== 'object' || Array.isArray(x)) return;
+        var nm = telField(x, TEL_KEYS.name), dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
+        if (typeof nm !== 'string' || !nm.trim()) return;
+        var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : telMs(telField(x, TEL_KEYS.rtime));
+        if (out !== null) rows.push({ name: nm, v: out });
+      });
+      return rows.length ? rows : null;
+    }
+    if (!o || typeof o !== 'object' || depth > 3) return null;
+    var ks = Object.keys(o);
+    for (var i = 0; i < ks.length; i++) { var got = telRows(o[ks[i]], depth + 1); if (got) return got; }
+    return null;
+  }
+  // Fine speciale: scrive il mio tempo e quelli degli avversari nella tappa aperta
+  function telFinish(o, f) {
+    var rows = telRows(o, 0) || [], mine = null, v;
+    function val(names) { for (var i = 0; i < names.length; i++) { if (names[i] in f) return f[names[i]]; if (('$' + names[i]) in f) return f['$' + names[i]]; } return null; }
+    if ((v = val(TEL_KEYS.ftime)) !== null) mine = telMs(v);
+    if (mine === null && telPick(f, TEL_KEYS.fin) && (v = val(TEL_KEYS.time)) !== null) mine = telMs(v);
+    if (mine === null && !rows.length) return;
+    var sig = JSON.stringify([mine, rows]);
+    if (sig === tel.sig) return;
+    var r = ui.manage && findRally(state, ui.manage);
+    if (!r || r.locked || arcOn() || !document.getElementById('tel-area')) return;   // riprova al prossimo messaggio, quando la tappa è aperta
+    var sel = selStage(r);
+    if (!sel) return;
+    tel.sig = sig;
+    var res = state.results[r.id] = state.results[r.id] || { pos: {} };
+    res.times = res.times || {};
+    var mt = res.times[sel.id] = res.times[sel.id] || {}, n = 0, miss = [], seen = {};
+    function put(did, t) { if (seen[did]) return; seen[did] = 1; if (mt[did] !== t) { mt[did] = t; n++; } }
+    if (mine !== null) {
+      if (tel.me && state.drivers.some(function (d) { return d.id === tel.me; })) put(tel.me, mine);
+      else miss.push('il tuo tempo (scegli «Il mio pilota»)');
+    }
+    rows.forEach(function (x) { var did = matchDriver(state, r, x.name); if (did) put(did, x.v); else miss.push(x.name); });
+    if (n) { cleanup(r.id); commit(); }
+    if (n || miss.length) toast((n ? 'Telemetria: ' + plural(n, 'tempo inserito', 'tempi inseriti') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Telemetria: nessun tempo inserito.') + (miss.length ? ' Non abbinati: ' + miss.join(', ') + '.' : ''));
+  }
+  function telPick(flat, names) { for (var i = 0; i < names.length; i++) if (names[i] in flat) return flat[names[i]]; return null; }
+  function telData(data) {
+    if (typeof data === 'string') {
+      var o; try { o = JSON.parse(data); } catch (e) { return; }
+      if (!o || typeof o !== 'object') return;
+      var f = Array.isArray(o) ? {} : telFlat(o, {}, 0), v;
+      if ((v = telPick(f, TEL_KEYS.thr)) !== null) tel.thr = telPedal(v);
+      if ((v = telPick(f, TEL_KEYS.brk)) !== null) tel.brk = telPedal(v);
+      if ((v = telPick(f, TEL_KEYS.dist)) !== null) tel.dist = v;
+      if ((v = telPick(f, TEL_KEYS.prog)) !== null) tel.prog = Math.max(0, Math.min(1, v > 1 ? v / 100 : v));
+      try { telFinish(o, f); } catch (e) { /* un messaggio strano non deve fermare la telemetria */ }
+    } else if (data instanceof ArrayBuffer && data.byteLength >= 128 && data.byteLength % 4 === 0) {
+      // Pacchetto UDP in formato Codemasters (DiRT Rally / DiRT Rally 2.0) inoltrato così com'è
+      var dv = new DataView(data);
+      tel.dist = dv.getFloat32(8, true); tel.thr = telPedal(dv.getFloat32(116, true)); tel.brk = telPedal(dv.getFloat32(124, true));
+    } else return;
+    telQueue();
+  }
+  function telOpen() {
+    var ws;
+    telStatus('wait');
+    try { ws = new WebSocket(tel.url); } catch (e) { tel.want = false; telStatus('err', 'Indirizzo non valido o bloccato dal browser'); render(); return; }
+    ws.binaryType = 'arraybuffer';
+    tel.ws = ws;
+    ws.onopen = function () { if (tel.ws === ws) telStatus('on'); };
+    ws.onmessage = function (e) { if (tel.ws === ws) telData(e.data); };
+    ws.onclose = function () {
+      if (tel.ws !== ws) return;
+      tel.ws = null;
+      if (!tel.want) return;
+      // caduta la linea: riprova da solo ogni 3 secondi finché non premi «Scollega»
+      telStatus('wait', '');
+      clearTimeout(tel.retry); tel.retry = setTimeout(function () { if (tel.want && !tel.ws) telOpen(); }, 3000);
+    };
+  }
+  function telClose() {
+    tel.want = false; clearTimeout(tel.retry);
+    var ws = tel.ws; tel.ws = null;
+    if (ws) { try { ws.close(); } catch (e) { /* ignora */ } }
+    tel.thr = 0; tel.brk = 0; tel.dist = null; tel.prog = null;
+    telStatus('off');
+  }
+
   function entryHtml(s, r, sel) {
     inheritTyres(s, r, sel);
     var T = timesOf(s, r.id)[sel.id] || {}, cl = classify(s, r, [sel.id], true), pm = {};
     cl.forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
     var tyres = tyresOf(r), weekend = sel.day === 'sab' || sel.day === 'dom';
     var note = '<p class="hint">Ordine dei piloti: ' + (weekend ? 'classifica generale dell’evento prima di questa tappa' : 'classifica del campionato') + '. Gomme disponibili: ' + esc(tyres.map(function (t) { return t[1]; }).join(', ')) + ' (si cambiano modificando l’evento). Le penalità non cambiano la classifica della prova né i punti della Power Stage: si sommano al tempo nelle classifiche di giornata e generale.</p>';
-    return note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
+    return telHtml(sel) + note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
       var id = 'tm-' + sel.id + '-' + d.id, ty = 'ty-' + sel.id + '-' + d.id, rec = tyreRec(s, r.id, sel.id, d.id);
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
       return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
@@ -2756,11 +2949,12 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     $bar.innerHTML = barHtml(s);
     $app.innerHTML = banner + '<main class="view' + (arcOn() ? ' arcview' : '') + '">' + v + '</main>' + footHtml();
     if (arcOn()) lockArchiveView();
+    telQueue();
   }
   // Evento di una stagione archiviata: si può solo sfogliare (tappe, classifiche, gomme), niente modifiche
   function arcOn() { return !!ui.manageArc && (ui.tab === 'storico-eventi' || ui.tab === 'storico-campionati'); }
   function lockArchiveView() {
-    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme'];
+    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect'];
     var drop = ['lock', 'toggle-add-stages', 'edit-stage', 'del-stage', 'time-rit', 'gm-add', 'gm-del', 'gm-copy', 'clear-results', 'edit-cancel', 'sa-row', 'sa-row-del'];
     Array.prototype.forEach.call($app.querySelectorAll('[data-action]'), function (b) {
       var a = b.getAttribute('data-action');
@@ -3048,6 +3242,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       state.rallies.forEach(function (r) { if (!r.locked && !absent(r, el.dataset.id)) r.assenti = (r.assenti || []).concat(el.dataset.id); });
       commit();
     },
+    'tel-connect': function () {
+      var inp = document.getElementById('tel-url'), url = inp ? inp.value.trim() : '';
+      if (url && !/^wss?:\/\//i.test(url)) url = 'ws://' + url;
+      if (!url) { telStatus('err', 'Scrivi l’indirizzo WebSocket'); if (inp) inp.focus(); return; }
+      tel.url = url;
+      try { localStorage.setItem('rally-tel-url', url); } catch (e) { /* ignora */ }
+      if (tel.ws) telClose();
+      tel.want = true; telOpen(); render();
+    },
+    'tel-disconnect': function () { telClose(); render(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
       if (!inp) return;
@@ -3206,6 +3410,15 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return v.length ? v : undefined;
   }
   var changes = {
+    'tel-me': function (el) {
+      tel.me = el.value || '';
+      try { localStorage.setItem('rally-tel-me', tel.me); } catch (e) { /* ignora */ }
+    },
+    'tel-unit': function (el) {
+      tel.unit = el.value === 'km' ? 'km' : 'm';
+      try { localStorage.setItem('rally-tel-unit', tel.unit); } catch (e) { /* ignora */ }
+      telQueue();
+    },
     'tyre-rename': function (el) {
       var l = ensureTyres(), t = l.filter(function (x) { return x.k === el.dataset.k; })[0], v = String(el.value || '').trim();
       if (!t) return;
