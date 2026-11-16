@@ -324,6 +324,7 @@ html.tel-lock, html.tel-lock body { overflow: hidden; }
 .brand-name { font-family: var(--f-display); font-weight: 700; font-size: 25px; line-height: 1.05; text-transform: uppercase; overflow-wrap: break-word; }
 .burger { order: 2; flex: none; width: 46px; height: 46px; display: grid; place-items: center; background: none; border: 0; border-radius: 8px; color: var(--ink-2); cursor: pointer; }
 .burger:hover { color: var(--ink); }
+.fsbtn { order: 1; }
 .menu { order: 3; flex-basis: 100%; display: none; flex-direction: column; gap: 6px; padding-block: 6px 14px; }
 .menu.open { display: flex; }
 .mi { background: none; border: 0; border-radius: 9px; padding: 14px 16px; text-align: left; cursor: pointer; font-family: var(--f-display); font-weight: 600; font-size: 21px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); }
@@ -331,6 +332,7 @@ html.tel-lock, html.tel-lock body { overflow: hidden; }
 .mi[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
 @media (min-width: 820px) {
   .burger { display: none; }
+  .burger.fsbtn { display: grid; order: 3; }
   .menu { display: flex; flex-basis: auto; flex-direction: row; order: 2; padding: 0; gap: 4px; }
   .mi { padding: 10px 14px; font-size: 19px; }
   .brand { flex: 1 1 280px; min-width: 280px; }
@@ -665,6 +667,43 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
 
 .login { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.8); display: grid; place-items: center; padding: 16px; }
 .login form { width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px; }
+
+/* ===== Telefono: tutta l'app ===== */
+@media (max-width: 640px) {
+  /* barra in alto più compatta: il nome del campionato sta su due righe al massimo */
+  .bar-in { gap: 0 6px; padding-block: 6px; }
+  .brand { gap: 10px; }
+  .logo { width: 36px; height: 36px; }
+  .brand-name { font-size: 18px; line-height: 1.1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  /* campi a 16px: così iPhone non ingrandisce la pagina quando tocchi un campo */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), select, textarea { font-size: 16px !important; }
+  .btn.small { min-height: 40px; }
+  .chk { min-height: 40px; }
+  /* inserimento tempi: una scheda per pilota invece di una tabella larga */
+  table.entry, table.entry tbody { display: block; width: 100%; }
+  table.entry thead { display: none; }
+  table.entry tr.pair { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; padding: 12px 12px 0; }
+  table.entry tr.pair td { display: block; padding: 0; border: 0; }
+  table.entry tr.pair td.posc { width: auto; min-width: 0; max-width: none; }
+  table.entry tr.pair td.num { grid-column: 1 / -1; padding-top: 10px; }
+  table.entry .tmwrap { justify-content: stretch; gap: 8px; }
+  table.entry .tmwrap input.tm { flex: 1 1 auto; width: auto; min-width: 0; min-height: 48px; font-size: 21px !important; text-align: center; }
+  table.entry .tmwrap .btn { min-height: 48px; min-width: 64px; }
+  table.entry tr.tyrow { display: block; padding: 8px 12px 14px; border-bottom: 1px solid var(--line); }
+  table.entry tr.tyrow:last-child { border-bottom: 0; }
+  table.entry tr.tyrow td { display: block; padding: 0; border: 0; }
+  table.entry tr.tyrow td:first-child { display: none; }
+  table.entry .tyre select { min-height: 46px; flex-basis: 100%; }
+  .wb { width: 44px; height: 44px; }
+  .xtra { gap: 8px 10px; }
+  .xtra .xt { flex: 0 0 auto; }
+  .xtra .xt.open { flex: 1 1 100%; }
+  .xt input.pn { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; }
+  .xt input.nt { min-height: 44px; }
+  .drv .eqn { white-space: normal; }
+  /* rispetta la tacca e la barra di sistema dei telefoni */
+  body { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+}
 </style>
 
 <div id="bar" class="topbar"></div>
@@ -1331,7 +1370,11 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         return '<button class="mi" type="button" data-action="tab" data-tab="' + t[0] + '"' + (ui.tab === t[0] ? ' aria-current="page"' : '') + '>' + t[1] + '</button>';
       }).join('') + '</nav>';
     }
-    return '<div class="bar-in"><div class="brand"><span class="logo">' + ICON_LOGO + '</span><span class="brand-name">' + esc(name) + '</span></div>' + burger + nav + '</div>';
+    // Schermo intero per tutta l'app: il pulsante c'è solo dove il browser lo permette (non su iPhone)
+    var fsOn = !!(document.fullscreenElement || document.webkitFullscreenElement), de = document.documentElement;
+    var fs = de.requestFullscreen || de.webkitRequestFullscreen ? '<button class="burger fsbtn" type="button" data-action="app-full" aria-pressed="' + fsOn + '" aria-label="' + (fsOn ? 'Esci dallo schermo intero' : 'Schermo intero') + '" title="' + (fsOn ? 'Esci dallo schermo intero' : 'Schermo intero') + '">' +
+      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (fsOn ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>') + '</svg></button>' : '';
+    return '<div class="bar-in"><div class="brand"><span class="logo">' + ICON_LOGO + '</span><span class="brand-name">' + esc(name) + '</span></div>' + fs + burger + nav + '</div>';
   }
   function footHtml() { return '<footer class="foot"><i></i><span id="save-status">' + esc(ui.status) + '</span></footer>'; }
 
@@ -2108,7 +2151,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     g.textAlign = 'right'; g.textBaseline = 'middle';
     [0, .5, 1].forEach(function (v) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(Math.round(v * 100) + '%', L - 6, y); });
     g.textAlign = 'center'; g.textBaseline = 'top';
-    for (var v = Math.ceil(x0 / tick - 1e-9) * tick; v <= x0 + span + 1e-9; v += tick) g.fillText(String(Math.round(v * 100) / 100).replace('.', ',') + (pctX ? '%' : ''), X(v), h - B + 6);
+    for (var v = Math.ceil(x0 / tick - 1e-9) * tick; v <= x0 + span + 1e-9; v += tick) if (pctX || X(v) < w - 34) g.fillText(String(Math.round(v * 100) / 100).replace('.', ',') + (pctX ? '%' : ''), X(v), h - B + 6);
     if (!pctX) { g.textAlign = 'right'; g.fillText('km', w - 2, h - B + 6); }
     if (pts.length) {
       g.save(); g.beginPath(); g.rect(L, T - 2, pw, ph + 4); g.clip();
@@ -2153,8 +2196,9 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     document.documentElement.classList.toggle('tel-lock', tel.full);
     var de = document.documentElement, fsEl = document.fullscreenElement || document.webkitFullscreenElement;
     try {
-      if (tel.full && !fsEl) { var rq = de.requestFullscreen || de.webkitRequestFullscreen; if (rq) { var pr = rq.call(de); if (pr && pr.catch) pr.catch(function () { /* resta la versione a tutta pagina */ }); } }
-      else if (!tel.full && fsEl) { var ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex) ex.call(document); }
+      if (tel.full && !fsEl) { var rq = de.requestFullscreen || de.webkitRequestFullscreen; if (rq) { tel.fsOwn = true; var pr = rq.call(de); if (pr && pr.catch) pr.catch(function () { /* resta la versione a tutta pagina */ }); } }
+      else if (!tel.full && fsEl && tel.fsOwn) { var ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex) ex.call(document); }
+      if (!tel.full) tel.fsOwn = false;
     } catch (e) { /* ignora */ }
     telWake(tel.full);
     var box = document.getElementById('tel-area');
@@ -2162,7 +2206,12 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     telQueue();
   }
   ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
-    document.addEventListener(ev, function () { if (tel.full && !(document.fullscreenElement || document.webkitFullscreenElement) && tel.fsWas) telFull(false); tel.fsWas = !!(document.fullscreenElement || document.webkitFullscreenElement); });
+    document.addEventListener(ev, function () {
+      var on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+      if (tel.full && !on && tel.fsWas && tel.fsOwn) telFull(false); else render();   // aggiorna l'icona nella barra in alto
+      if (!on) tel.fsOwn = false;
+      tel.fsWas = on;
+    });
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && tel.full) telFull(false); });
   document.addEventListener('visibilitychange', function () { if (tel.full && document.visibilityState === 'visible') telWake(true); });
@@ -3457,7 +3506,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   // Evento di una stagione archiviata: si può solo sfogliare (tappe, classifiche, gomme), niente modifiche
   function arcOn() { return !!ui.manageArc && (ui.tab === 'storico-eventi' || ui.tab === 'storico-campionati'); }
   function lockArchiveView() {
-    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect', 'tel-clear', 'tel-test', 'tel-raw-show', 'tel-raw-copy', 'tel-full'];
+    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect', 'tel-clear', 'tel-test', 'tel-raw-show', 'tel-raw-copy', 'tel-full', 'app-full'];
     var drop = ['lock', 'toggle-add-stages', 'edit-stage', 'del-stage', 'time-rit', 'gm-add', 'gm-del', 'gm-copy', 'clear-results', 'edit-cancel', 'sa-row', 'sa-row-del'];
     Array.prototype.forEach.call($app.querySelectorAll('[data-action]'), function (b) {
       var a = b.getAttribute('data-action');
@@ -3783,6 +3832,13 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       crewShow(); toast('Dati della telemetria reinseriti (' + plural(rec.src.length, 'crew', 'crew') + ').');
     },
     'tel-full': function () { telFull(!tel.full); },
+    'app-full': function () {
+      var de = document.documentElement, on = document.fullscreenElement || document.webkitFullscreenElement;
+      try {
+        if (on) { tel.fsOwn = false; (document.exitFullscreen || document.webkitExitFullscreen).call(document); }
+        else { var pr = (de.requestFullscreen || de.webkitRequestFullscreen).call(de); if (pr && pr.catch) pr.catch(function () { toast('Il browser non ha permesso lo schermo intero.'); }); }
+      } catch (e) { toast('Il browser non ha permesso lo schermo intero.'); }
+    },
     'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
