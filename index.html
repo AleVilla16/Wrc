@@ -2130,18 +2130,45 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     })(obj, '', 0);
     return ex;
   }
-  // Cerca nel messaggio la classifica: un elenco di righe con il nome della crew e, se ci sono, tempo e altri dati
+  // Colonna del nome: quella con un titolo noto (crew, driver, pilota…), altrimenti la prima che contiene un testo vero
+  function telNameKey(x, strict) {
+    var k = telKeyOf(x, TEL_KEYS.name), ks, i, v;
+    if (k && typeof x[k] === 'string' && x[k].trim()) return k;
+    if (strict) return null;
+    for (ks = Object.keys(x), i = 0; i < ks.length; i++) {
+      v = x[ks[i]];
+      if (typeof v === 'string' && v.trim() && /[a-zà-ÿ]{2}/i.test(v) && !/^[+\-]?\d{1,2}:\d{2}/.test(v) && !/^#[0-9a-f]{3,8}$/i.test(v)) return ks[i];
+    }
+    return null;
+  }
+  // Colonna del tempo: titolo noto, oppure un titolo che parla di tempo, oppure il primo valore scritto come MM:SS.mmm
+  function telTimeKey(x, nk) {
+    var k = telKeyOf(x, TEL_KEYS.rtime), ks = Object.keys(x), i;
+    if (k && telMs(x[k]) !== null) return k;
+    for (i = 0; i < ks.length; i++) if (ks[i] !== nk && /time|tempo/i.test(ks[i]) && !/total|overall|gap|diff|totale|distacco/i.test(ks[i]) && telMs(x[ks[i]]) !== null) return ks[i];
+    for (i = 0; i < ks.length; i++) if (ks[i] !== nk && typeof x[ks[i]] === 'string' && /^\d{1,2}:\d{2}([.,]\d+)?$/.test(x[ks[i]].trim()) && telMs(x[ks[i]]) !== null) return ks[i];
+    return k;
+  }
+  // Cerca nel messaggio la classifica: un elenco di righe con il nome della crew e, se ci sono, tempo e altri dati.
+  // Accetta anche classifiche con titoli di colonna sconosciuti e classifiche "a tabella" (righe come liste di valori).
   function telRows(o, depth, parent) {
     if (Array.isArray(o)) {
-      var rows = [];
-      o.forEach(function (x) {
-        if (!x || typeof x !== 'object' || Array.isArray(x)) return;
-        var nk = telKeyOf(x, TEL_KEYS.name), nm = nk ? x[nk] : null, dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
+      var list = o, rows = [];
+      if (list.length >= 2 && list.every(function (x) { return Array.isArray(x) && x.length >= 2 && x.every(function (q) { return q === null || typeof q !== 'object'; }); })) {
+        // tabella: se la prima riga è fatta solo di testi la uso come intestazione
+        var head = list[0].every(function (q) { return typeof q === 'string' && q.trim() && isNaN(Number(q)) && !/^\d{1,2}:\d{2}/.test(q); }) && list.length > 2 ? list[0] : null;
+        list = list.slice(head ? 1 : 0).map(function (row) { var ob = {}; row.forEach(function (q, i) { ob[head && head[i] ? String(head[i]) : 'Colonna ' + (i + 1)] = q; }); return ob; });
+      }
+      var objs = list.filter(function (x) { return x && typeof x === 'object' && !Array.isArray(x); });
+      // senza titoli noti la prendo per classifica solo se è un vero elenco: almeno 2 righe, tutte con un nome
+      var strict = objs.some(function (x) { return telNameKey(x, true); }) || !(objs.length >= 2 && objs.length === list.length && objs.every(function (x) { return telNameKey(x, false); }));
+      objs.forEach(function (x) {
+        var nk = telNameKey(x, strict), nm = nk ? x[nk] : null, dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
         if (typeof nm !== 'string' || !nm.trim()) return;
-        var tk = telKeyOf(x, TEL_KEYS.rtime), tm = tk ? telMs(x[tk]) : null;
+        var tk = telTimeKey(x, nk), tm = tk ? telMs(x[tk]) : null;
         var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : tm;
         var ex = telAll(x, tk && tm !== null ? [nk, tk] : [nk]);      // un tempo non leggibile resta visibile così com'è
-        if (out === null && !Object.keys(ex).length) return;
+        if (out === null && !Object.keys(ex).length && strict) return;
         rows.push({ name: nm, v: out, ex: ex });
       });
       if (!rows.length) return null;
@@ -2150,11 +2177,15 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (parent && !telKeyOf(parent, TEL_KEYS.thr.concat(TEL_KEYS.brk))) Object.keys(parent).forEach(function (k) { var v = parent[k]; if (v !== null && v !== '' && typeof v !== 'object') meta[k] = typeof v === 'boolean' ? (v ? 'Sì' : 'No') : String(v).slice(0, 80); });
       return { rows: rows, meta: meta };
     }
-    if (!o || typeof o !== 'object' || depth > 3) return null;
+    if (!o || typeof o !== 'object' || depth > 4) return null;
     var ks = Object.keys(o);
-    if (ks.length >= 2 && ks.every(function (k) { var q = o[k]; return q && typeof q === 'object' && !Array.isArray(q) && telKeyOf(q, TEL_KEYS.name); })) {
-      var asList = telRows(ks.map(function (k) { return o[k]; }), depth + 1, null);
-      if (asList) return asList;
+    // classifica "a chiavi" (1: {...}, 2: {...}): tutte le voci sono righe fatte allo stesso modo
+    if (ks.length >= 2 && ks.every(function (k) { var q = o[k]; return q && typeof q === 'object' && !Array.isArray(q) && telNameKey(q, false); })) {
+      var sameShape = ks.every(function (k) { return Object.keys(o[k]).sort().join() === Object.keys(o[ks[0]]).sort().join(); });
+      if (ks.every(function (k) { return /^\d+$/.test(k); }) || (sameShape && ks.length >= 3) || ks.every(function (k) { return telNameKey(o[k], true); })) {
+        var asList = telRows(ks.map(function (k) { return o[k]; }), depth + 1, null);
+        if (asList) return asList;
+      }
     }
     for (var i = 0; i < ks.length; i++) { var got = telRows(o[ks[i]], depth + 1, o); if (got) return got; }
     return null;
