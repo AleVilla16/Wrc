@@ -231,6 +231,9 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-leg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
 .tel-leg b, .tel-leg .tel-at { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3ch; }
 .tel-cv { display: block; width: 100%; height: 190px; touch-action: pan-y; cursor: crosshair; }
+.crew-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; font-size: 14px; color: var(--ink-2); }
+.crew-meta b { font-weight: 600; }
+#crew-area td, #crew-area th { white-space: nowrap; }
 .crew-sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--line); }
 .tel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 260px); gap: 18px; align-items: stretch; }
 @media (max-width: 760px) { .tel-body { grid-template-columns: minmax(0, 1fr); } }
@@ -1847,8 +1850,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   /* ---------- Dati delle crew a fine tappa (arrivano dalla telemetria) ---------- */
   var crewData = {};
   try { crewData = JSON.parse(localStorage.getItem('rally-tel-crew') || '{}') || {}; } catch (e) { crewData = {}; }
-  function crewSave(key, rows) {
-    if (rows) crewData[key] = { at: Date.now(), rows: rows }; else delete crewData[key];
+  function crewSave(key, rows, meta) {
+    if (rows) crewData[key] = { at: Date.now(), rows: rows, meta: meta || {} }; else delete crewData[key];
     var ks = Object.keys(crewData).sort(function (a, b) { return crewData[b].at - crewData[a].at; });
     ks.slice(40).forEach(function (k) { delete crewData[k]; });
     try { localStorage.setItem('rally-tel-crew', JSON.stringify(crewData)); } catch (e) { /* ignora */ }
@@ -1887,9 +1890,10 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     if (hasPos) rows.sort(function (a, b) { var pa = posOf(a), pb = posOf(b); return (pa === null ? 1e9 : pa) - (pb === null ? 1e9 : pb) || tv(a) - tv(b); });
     else rows.sort(function (a, b) { return tv(a) - tv(b); });
     var times = rows.map(function (x) { return x.v; }).filter(function (v) { return typeof v === 'number'; }), best = times.length ? Math.min.apply(null, times) : null;
-    rows.forEach(function (x) { Object.keys(x.ex || {}).forEach(function (k) { if (!posKey[k] && cols.indexOf(k) < 0 && cols.length < 8) cols.push(k); }); });
+    rows.forEach(function (x) { Object.keys(x.ex || {}).forEach(function (k) { if (!posKey[k] && cols.indexOf(k) < 0) cols.push(k); }); });
     var byId = {}; state.drivers.forEach(function (d) { byId[d.id] = d; });
     return '<div class="tel" id="crew-area"><div class="tel-head"><h4>Crew a fine tappa</h4><span class="hint">' + plural(rows.length, 'crew', 'crew') + ' · classifica ricevuta dalla telemetria</span></div>' +
+      (Object.keys(rec.meta || {}).length ? '<p class="crew-meta">' + Object.keys(rec.meta).map(function (k) { return '<span><b>' + esc(crewLabel(k)) + ':</b> ' + esc(rec.meta[k]) + '</span>'; }).join('') + '</p>' : '') +
       '<div class="tablewrap"><table class="cls"><thead><tr><th scope="col">#</th><th scope="col">Crew</th><th scope="col">Pilota abbinato</th><th class="num" scope="col">Tempo</th><th class="num" scope="col">Distacco</th>' +
       cols.map(function (k) { return '<th scope="col">' + esc(crewLabel(k)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       rows.map(function (x, i) {
@@ -1898,7 +1902,9 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
           '<td class="num">' + (out ? 'RIT' : none ? '–' : esc(fmtTime(x.v))) + '</td><td class="num">' + (out || none || best === null ? '–' : (x.v === best ? '—' : '+' + esc((x.v - best) < 60000 ? ((x.v - best) / 1000).toFixed(3).replace('.', ',') : fmtTime(x.v - best)))) + '</td>' +
           cols.map(function (k) { return '<td>' + crewCell(k, x.ex ? x.ex[k] : null) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' +
-      '<div class="actions"><button class="btn small ghost" type="button" data-action="crew-clear" data-key="' + esc(r.id + '|' + sel.id) + '">Nascondi</button></div></div>';
+      '<p class="hint">Questi dati sono solo mostrati: nella tabella dei tempi non viene scritto nulla finché non premi «Inserisci i tempi nella tappa» (vale per le crew abbinate a un pilota).</p>' +
+      '<div class="actions"><button class="btn small" type="button" data-action="crew-apply" data-key="' + esc(r.id + '|' + sel.id) + '"' + (rows.some(function (x) { return x.did && x.v !== null; }) ? '' : ' disabled') + '>Inserisci i tempi nella tappa</button>' +
+      '<button class="btn small ghost" type="button" data-action="crew-clear" data-key="' + esc(r.id + '|' + sel.id) + '">Nascondi</button></div></div>';
   }
 
   /* ---------- Telemetria in diretta via WebSocket ---------- */
@@ -1928,7 +1934,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       (live ? '<button class="btn" type="button" data-action="tel-disconnect">Scollega</button>' : '<button class="btn primary" type="button" data-action="tel-connect">Collega</button>') + '</div>' +
       '<div class="tel-me"><label for="tel-me">Il mio pilota</label><select id="tel-me" data-change="tel-me"><option value="">— scegli —</option>' + (state && state.drivers ? state.drivers : []).map(function (d) { return '<option value="' + d.id + '"' + (d.id === tel.me ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select>' +
       '<label class="chk tel-snd"><input type="checkbox" data-change="tel-snd"' + (tel.snd ? ' checked' : '') + '>Segnali acustici</label><button class="btn small ghost" type="button" data-action="tel-test">Prova suono</button>' +
-      '<span class="hint">A fine speciale il tuo tempo va a questo pilota e quelli degli avversari ai piloti con lo stesso nome equivalente.</span></div>' +
+      '<span class="hint">A fine speciale il tuo tempo e la classifica compaiono in «Crew a fine tappa», abbinati ai piloti per nome equivalente. Nella tappa li inserisci tu, con il pulsante.</span></div>' +
       '<div class="tel-body"><div class="tel-chart"><div class="tel-chead"><h5>Ultimi 2 km</h5><div class="tel-leg"><span><i style="background:var(--good)"></i>Acceleratore <b id="tel-ct-v"></b></span><span><i style="background:var(--bad)"></i>Freno <b id="tel-cb-v"></b></span><span class="tel-at" id="tel-c-at"></span></div></div>' +
       '<canvas class="tel-cv" id="tel-c" role="img" aria-label="Grafico: acceleratore e pressione del freno in percentuale negli ultimi 2 km percorsi"></canvas>' +
       '<div class="actions"><button class="btn small ghost" type="button" data-action="tel-clear">Azzera grafico</button></div></div><div class="tel-pedals">' +
@@ -2097,66 +2103,86 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return undefined;
   }
   // Cerca nel messaggio un elenco di risultati: righe con un nome e un tempo (o un ritiro)
-  function telRows(o, depth) {
+  function telKeyOf(o, names) {
+    var keys = Object.keys(o), i, j;
+    for (i = 0; i < names.length; i++) for (j = 0; j < keys.length; j++) if (keys[j].toLowerCase().replace(/[^a-z0-9]/g, '') === names[i]) return keys[j];
+    return null;
+  }
+  // Tutti i dati di un oggetto come coppie titolo → testo (anche quelli annidati), tranne le chiavi in "skip"
+  function telAll(obj, skip) {
+    var ex = {};
+    (function add(o, pre, deep) {
+      Object.keys(o).forEach(function (k) {
+        var val = o[k];
+        if ((!pre && skip.indexOf(k) >= 0) || val === null || val === undefined || val === '') return;
+        if (Array.isArray(val)) { if (val.length && val.every(function (q) { return q === null || typeof q !== 'object'; })) ex[pre + k] = val.join(', ').slice(0, 80); else if (val.length) ex[pre + k] = JSON.stringify(val).slice(0, 80); return; }
+        if (typeof val === 'object') { if (deep < 3) add(val, pre + k + ' ', deep + 1); return; }
+        ex[pre + k] = typeof val === 'boolean' ? (val ? 'Sì' : 'No') : String(val).slice(0, 80);
+      });
+    })(obj, '', 0);
+    return ex;
+  }
+  // Cerca nel messaggio la classifica: un elenco di righe con il nome della crew e, se ci sono, tempo e altri dati
+  function telRows(o, depth, parent) {
     if (Array.isArray(o)) {
       var rows = [];
       o.forEach(function (x) {
         if (!x || typeof x !== 'object' || Array.isArray(x)) return;
-        var nm = telField(x, TEL_KEYS.name), dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
+        var nk = telKeyOf(x, TEL_KEYS.name), nm = nk ? x[nk] : null, dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
         if (typeof nm !== 'string' || !nm.trim()) return;
-        var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : telMs(telField(x, TEL_KEYS.rtime));
-        var ex = {}, skip = TEL_KEYS.name.concat(TEL_KEYS.rtime, TEL_KEYS.dnf);
-        (function add(obj, pre, deep) {
-          Object.keys(obj).forEach(function (k) {
-            var val = obj[k], kk = k.toLowerCase().replace(/[^a-z0-9]/g, '');
-            if ((!pre && skip.indexOf(kk) >= 0) || val === null || val === '') return;
-            if (typeof val === 'object') { if (deep < 1 && !Array.isArray(val)) add(val, pre + k + ' ', deep + 1); else if (Array.isArray(val) && val.every(function (q) { return typeof q !== 'object'; })) ex[pre + k] = val.join(', ').slice(0, 40); return; }
-            ex[pre + k] = typeof val === 'boolean' ? (val ? 'Sì' : 'No') : String(val).slice(0, 40);
-          });
-        })(x, '', 0);
+        var tk = telKeyOf(x, TEL_KEYS.rtime), tm = tk ? telMs(x[tk]) : null;
+        var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : tm;
+        var ex = telAll(x, tk && tm !== null ? [nk, tk] : [nk]);      // un tempo non leggibile resta visibile così com'è
         if (out === null && !Object.keys(ex).length) return;
         rows.push({ name: nm, v: out, ex: ex });
       });
-      return rows.length ? rows : null;
+      if (!rows.length) return null;
+      // dati generali della classifica (prova, rally, data…), se non è il pacchetto della guida
+      var meta = {};
+      if (parent && !telKeyOf(parent, TEL_KEYS.thr.concat(TEL_KEYS.brk))) Object.keys(parent).forEach(function (k) { var v = parent[k]; if (v !== null && v !== '' && typeof v !== 'object') meta[k] = typeof v === 'boolean' ? (v ? 'Sì' : 'No') : String(v).slice(0, 80); });
+      return { rows: rows, meta: meta };
     }
     if (!o || typeof o !== 'object' || depth > 3) return null;
     var ks = Object.keys(o);
-    for (var i = 0; i < ks.length; i++) { var got = telRows(o[ks[i]], depth + 1); if (got) return got; }
+    for (var i = 0; i < ks.length; i++) { var got = telRows(o[ks[i]], depth + 1, o); if (got) return got; }
     return null;
   }
-  // Fine speciale: scrive il mio tempo e quelli degli avversari nella tappa aperta
+  // Fine speciale: raccoglie la classifica e la mostra in «Crew a fine tappa». Non scrive nulla nella tappa: lo fai tu con il pulsante.
   function telFinish(o, f) {
-    var rows = telRows(o, 0) || [], mine = null, v;
+    var got = telRows(o, 0, null), rows = got ? got.rows : [], mine = null, v;
     function val(names) { for (var i = 0; i < names.length; i++) { if (names[i] in f) return f[names[i]]; if (('$' + names[i]) in f) return f['$' + names[i]]; } return null; }
     if ((v = val(TEL_KEYS.ftime)) !== null) mine = telMs(v);
     if (mine === null && telPick(f, TEL_KEYS.fin) && (v = val(TEL_KEYS.time)) !== null) mine = telMs(v);
     if (mine === null && !rows.length) return;
-    var sig = JSON.stringify([mine, rows]);
+    var sig = JSON.stringify([mine, got]);
     if (sig === tel.sig) return;
     var r = ui.manage && findRally(state, ui.manage);
-    if (!r || r.locked || arcOn() || !document.getElementById('tel-area')) return;   // riprova al prossimo messaggio, quando la tappa è aperta
+    if (!r || arcOn() || !document.getElementById('tel-area')) return;   // riprova al prossimo messaggio, quando la tappa è aperta
     var sel = selStage(r);
     if (!sel) return;
     tel.sig = sig;
-    var res = state.results[r.id] = state.results[r.id] || { pos: {} };
-    res.times = res.times || {};
-    var mt = res.times[sel.id] = res.times[sel.id] || {}, n = 0, miss = [], seen = {};
-    function put(did, t) { if (seen[did]) return; seen[did] = 1; if (mt[did] !== t) { mt[did] = t; n++; } }
-    if (mine !== null) {
-      if (tel.me && state.drivers.some(function (d) { return d.id === tel.me; })) put(tel.me, mine);
-      else miss.push('il tuo tempo (scegli «Il mio pilota»)');
-    }
-    var crew = [];
-    if (mine !== null) crew.push({ name: (state.drivers.filter(function (d) { return d.id === tel.me; })[0] || {}).name || 'Tu', v: mine, did: seen[tel.me] ? tel.me : '', me: 1, ex: {} });
+    var crew = [], hasMe = tel.me && state.drivers.some(function (d) { return d.id === tel.me; });
+    if (mine !== null) crew.push({ name: (state.drivers.filter(function (d) { return d.id === tel.me; })[0] || {}).name || 'Tu', v: mine, did: hasMe ? tel.me : '', me: 1, ex: {} });
     rows.forEach(function (x) {
       var did = matchDriver(state, r, x.name);
       if (did && did === tel.me && mine !== null) { crew[0].ex = x.ex; crew[0].name = x.name; return; }   // la mia riga è già in elenco
       crew.push({ name: x.name, v: x.v, did: did || '', ex: x.ex });
-      if (did) { if (x.v !== null) put(did, x.v); } else miss.push(x.name);
     });
-    crewSave(r.id + '|' + sel.id, crew);
-    if (n) { cleanup(r.id); commit(); } else setHtml('crew-wrap', crewHtml(r, sel));
-    if (n || miss.length) toast((n ? 'Telemetria: ' + plural(n, 'tempo inserito', 'tempi inseriti') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Telemetria: nessun tempo inserito.') + (miss.length ? ' Non abbinati: ' + miss.join(', ') + '.' : ''));
+    crewSave(r.id + '|' + sel.id, crew, got ? got.meta : {});
+    setHtml('crew-wrap', crewHtml(r, sel));
+    toast('Telemetria: classifica ricevuta per ' + (labelsOf(r)[sel.id] || 'questa tappa') + ' (' + plural(crew.length, 'crew', 'crew') + '). Nessun dato è stato inserito in automatico.');
+  }
+  // Inserimento a mano: copia nella tappa i tempi delle crew abbinate a un pilota
+  function crewApply(key) {
+    var r = ui.manage && findRally(state, ui.manage), sel = r && selStage(r), rec = crewData[key];
+    if (!r || !sel || !rec || key !== r.id + '|' + sel.id) return;
+    if (r.locked || arcOn()) { toast('Evento bloccato: i tempi non si possono modificare.'); return; }
+    var res = state.results[r.id] = state.results[r.id] || { pos: {} };
+    res.times = res.times || {};
+    var mt = res.times[sel.id] = res.times[sel.id] || {}, n = 0, seen = {};
+    rec.rows.forEach(function (x) { if (!x.did || x.v === null || seen[x.did]) return; seen[x.did] = 1; if (mt[x.did] !== x.v) { mt[x.did] = x.v; n++; } });
+    if (n) { cleanup(r.id); commit(); }
+    toast(n ? plural(n, 'tempo inserito', 'tempi inseriti') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Nessun tempo nuovo da inserire.');
   }
   function telPick(flat, names) { for (var i = 0; i < names.length; i++) if (names[i] in flat) return flat[names[i]]; return null; }
   function telData(data) {
@@ -3468,6 +3494,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     },
     'tel-disconnect': function () { telClose(); render(); },
     'tel-test': function () { var was = tel.snd; tel.snd = true; telBeep(1); setTimeout(function () { telBeep(2); tel.snd = was; }, 700); },
+    'crew-apply': function (el) { crewApply(el.dataset.key); },
     'crew-clear': function (el) { crewSave(el.dataset.key, null); setHtml('crew-wrap', ''); },
     'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
