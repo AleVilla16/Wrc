@@ -231,6 +231,8 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-leg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
 .tel-leg b, .tel-leg .tel-at { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3ch; }
 .tel-cv { display: block; width: 100%; height: 190px; touch-action: pan-y; cursor: crosshair; }
+.cap-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cap-shot { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--line); }
 .tel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 260px); gap: 18px; align-items: stretch; }
 @media (max-width: 760px) { .tel-body { grid-template-columns: minmax(0, 1fr); } }
 .tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
@@ -1726,9 +1728,9 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return 'Sei un lettore di schermate di un videogioco di rally. Le immagini allegate sono foto o screenshot della schermata dei risultati di una prova speciale (tappa "' + (sel.name || sel.id) + '"): possono contenere l’elenco dei piloti con i tempi e/o le gomme usate con il relativo livello di usura. Se le immagini sono più di una, possono mostrare dati diversi degli stessi piloti (ad esempio tempi in una e gomme in un’altra): uniscili per nome.\n\n' +
       'Nomi dei piloti che ti aspetti (come compaiono nel gioco, anche abbreviati o in maiuscolo): ' + (names.length ? names.join(', ') : '(non noti)') + '. Nell’elenco possono comparire anche altri nomi: riportali comunque.\n\n' +
       'Per ogni pilota visibile restituisci:\n' +
-      '- "name": il nome esattamente come scritto nell’immagine;\n' +
+      '- "name": il nome esattamente come scritto nell’immagine (la colonna può chiamarsi «Crew» o «Equipaggio»: se riporta pilota e navigatore, usa il nome del pilota);\n' +
       '- "time": il tempo di prova (non il distacco, non il tempo totale di gara se è indicata una colonna diversa) nel formato MM:SS.mmm, oppure "RIT" se il pilota è ritirato, oppure null se non leggibile o assente;\n' +
-      '- "tyre": una di queste chiavi se riconosci le gomme montate, altrimenti null: ' + TYRES.map(function (t) { return '"' + t[0] + '" (' + t[1] + ')'; }).join(', ') + ';\n' +
+      '- "tyre": una di queste chiavi se riconosci le gomme montate (dal nome, dalla sigla o dall’icona degli pneumatici), altrimenti null: ' + TYRES.map(function (t) { return '"' + t[0] + '" (' + t[1] + ')'; }).join(', ') + ';\n' +
       '- "wear": la condizione/usura delle gomme a FINE prova (schermata dei risultati), 0 = bassa/verde, 1 = media/gialla, 2 = alta/rossa; se è mostrata una percentuale di usura usa 0 fino al 33%, 1 fino al 66%, 2 oltre; null se non visibile;\n' +
       '- "wearStart": la condizione delle gomme a INIZIO prova, con la stessa scala 0/1/2, solo se l’immagine la mostra come tale (ad esempio la schermata prima della partenza); altrimenti null. Se l’immagine è chiaramente una schermata prima della partenza, metti il valore in "wearStart" e lascia "wear" a null.\n\n' +
       'Non inventare nulla: se un dato non si legge con sicurezza metti null. Rispondi SOLO con JSON valido, senza testo attorno, in questa forma: {"rows":[{"name":"...","time":"01:23.456","tyre":"asf-m","wearStart":0,"wear":1}]}';
@@ -1839,10 +1841,60 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     Promise.resolve(cl.use('sample')).then(function (smp) {
       if (!smp || typeof smp.limits !== 'function') return;
       return Promise.resolve(smp.limits()).then(function (l) {
-        if (l && l.images) { scanCaps = { sample: smp, lim: l.images }; refreshScan(); }
+        if (l && l.images) { scanCaps = { sample: smp, lim: l.images }; refreshScan(); capRefresh(); }
       });
     }).catch(function () { /* funzione non disponibile: resta nascosta */ });
   }
+  /* ---------- Cattura dello schermo (risultati della prova) ---------- */
+  var cap = { stream: null, video: null, url: '', busy: false, msg: '' };
+  function capOk() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
+  function capHtml() {
+    var out = '<div class="tel" id="cap-area"><div class="tel-head"><h4>Cattura schermo</h4><span class="tel-st ' + (cap.stream ? 'on' : 'off') + '" role="status"><i></i><span>' + (cap.stream ? 'Schermo collegato' : 'Schermo non collegato') + '</span></span></div>';
+    if (!capOk()) return out + '<p class="hint">La cattura dello schermo funziona solo da computer (Chrome, Edge o Firefox). Da telefono usa «Scatta foto» qui sotto.</p></div>';
+    out += '<p class="hint">Cattura la schermata dei risultati della prova e leggo per ogni riga <b>Crew</b>, <b>pneumatici</b> (tipo e colore) e <b>tempo</b>. Alla prima cattura il browser chiede quale schermo condividere: scegli «Schermo 1». La scelta resta attiva finché non premi «Scollega schermo».</p>' +
+      '<div class="cap-acts"><button class="btn primary" type="button" data-action="cap-shot"' + (cap.busy ? ' disabled' : '') + '>' + (cap.stream ? 'Cattura e leggi' : 'Collega schermo e cattura') + '</button>' +
+      (cap.stream ? '<button class="btn" type="button" data-action="cap-stop">Scollega schermo</button>' : '') + '</div>';
+    if (cap.msg) out += '<p class="warn" role="alert">' + esc(cap.msg) + '</p>';
+    if (cap.url) out += '<a href="' + cap.url + '" target="_blank" rel="noopener" title="Apri la schermata a grandezza piena"><img class="cap-shot" src="' + cap.url + '" alt="Ultima schermata catturata"></a>' +
+      (scanCaps ? '<p class="hint">I dati letti compaiono qui sotto in «Leggi da foto»: controllali e premi «Applica a questa tappa».</p>' : '<p class="warn">Schermata catturata, ma in questa versione dell’app la lettura automatica delle immagini non è disponibile: copia i dati a mano nella tabella qui sotto.</p>');
+    return out + '</div>';
+  }
+  function capRefresh() { setHtml('cap-wrap', capHtml()); }
+  function capStop() {
+    if (cap.stream) cap.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* ignora */ } });
+    cap.stream = null; cap.video = null;
+  }
+  function capStart() {
+    if (cap.stream) return Promise.resolve();
+    return navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor' }, audio: false }).then(function (st) {
+      var v = document.createElement('video');
+      v.muted = true; v.playsInline = true; v.srcObject = st;
+      cap.stream = st; cap.video = v;
+      st.getVideoTracks()[0].addEventListener('ended', function () { if (cap.stream === st) { capStop(); capRefresh(); } });
+      return v.play().then(function () { return new Promise(function (ok) { setTimeout(ok, 400); }); });   // aspetta il primo fotogramma
+    });
+  }
+  function capShot() {
+    if (cap.busy) return;
+    cap.busy = true; cap.msg = ''; capRefresh();
+    capStart().then(function () {
+      var v = cap.video, w = v && v.videoWidth, h = v && v.videoHeight;
+      if (!w || !h) throw new Error('vuoto');
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(v, 0, 0, w, h);
+      return new Promise(function (ok, ko) { c.toBlob(function (b) { if (b) ok(b); else ko(new Error('vuoto')); }, 'image/png'); });
+    }).then(function (blob) {
+      if (cap.url) { try { URL.revokeObjectURL(cap.url); } catch (e) { /* ignora */ } }
+      cap.url = URL.createObjectURL(blob);
+      cap.busy = false; capRefresh();
+      if (scanCaps) runScan([new File([blob], 'schermo.png', { type: 'image/png' })]);
+    }).catch(function (e) {
+      cap.busy = false;
+      cap.msg = e && (e.name === 'NotAllowedError' || e.name === 'AbortError') ? 'Cattura annullata: per leggere la schermata devi scegliere lo schermo da condividere.' : 'Non sono riuscito a catturare lo schermo. Riprova.';
+      capRefresh();
+    });
+  }
+
   /* ---------- Telemetria in diretta via WebSocket ---------- */
   var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, len: null, raf: 0, want: false, retry: 0, tr: { mode: 'd', pts: [] }, hover: null, snd: true, ac: null, pf: null, bz: { mid: false, last: false } };
   try { tel.url = localStorage.getItem('rally-tel-url') || ''; tel.unit = localStorage.getItem('rally-tel-unit') === 'km' ? 'km' : 'm'; tel.me = localStorage.getItem('rally-tel-me') || ''; tel.snd = localStorage.getItem('rally-tel-snd') !== '0'; } catch (e) { /* ignora */ }
@@ -2135,7 +2187,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     cl.forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
     var tyres = tyresOf(r), weekend = sel.day === 'sab' || sel.day === 'dom';
     var note = '<p class="hint">Ordine dei piloti: ' + (weekend ? 'classifica generale dell’evento prima di questa tappa' : 'classifica del campionato') + '. Gomme disponibili: ' + esc(tyres.map(function (t) { return t[1]; }).join(', ')) + ' (si cambiano modificando l’evento). Le penalità non cambiano la classifica della prova né i punti della Power Stage: si sommano al tempo nelle classifiche di giornata e generale.</p>';
-    return telHtml(sel) + note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
+    return telHtml(sel) + (s === state ? '<div id="cap-wrap">' + capHtml() + '</div>' : '') + note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
       var id = 'tm-' + sel.id + '-' + d.id, ty = 'ty-' + sel.id + '-' + d.id, rec = tyreRec(s, r.id, sel.id, d.id);
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
       return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
@@ -3392,6 +3444,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     },
     'tel-disconnect': function () { telClose(); render(); },
     'tel-test': function () { var was = tel.snd; tel.snd = true; telBeep(1); setTimeout(function () { telBeep(2); tel.snd = was; }, 700); },
+    'cap-shot': function () { capShot(); },
+    'cap-stop': function () { capStop(); cap.msg = ''; capRefresh(); },
     'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
