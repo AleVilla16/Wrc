@@ -541,6 +541,8 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .xt.open .xt-in { display: flex; }
 .warn-ico { background: none; border: 0; padding: 4px; margin: 0; border-radius: 8px; cursor: pointer; display: inline-flex; line-height: 0; min-width: 36px; min-height: 36px; align-items: center; justify-content: center; }
 .warn-ico:hover { background: var(--surface-2); }
+.note-ico { color: var(--ink-2); }
+.xt.open .note-ico { color: var(--ink); }
 .warn-ico:disabled { opacity: .5; cursor: default; }
 .xt input.nt { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; }
 .xt input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
@@ -1894,7 +1896,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae])(type|tipo|compound|mescola|name|nome)$/, 'Tipo pneumatici'],
     [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae])(colou?r|colore)$/, 'Colore pneumatici'],
     [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae]|compound|mescola)$/, 'Pneumatici'],
-    [/^(colou?r|colore)$/, 'Colore'], [/^(car|vehicle|auto|vettura)(name)?$/, 'Auto'], [/^(class|classe|category|categoria)$/, 'Classe'],
+    [/^(tyre|tire|tyres|tires|pneumatic[oi]|gomm[ae])?(wear|usura)(colou?r|colore)?$/, 'Usura gomme (fine prova)'], [/^(colou?r|colore)$/, 'Colore'], [/^(car|vehicle|auto|vettura)(name)?$/, 'Auto'], [/^(class|classe|category|categoria)$/, 'Classe'],
     [/^(gap|diff|difference|distacco|delta)$/, 'Distacco (classifica)'], [/^(penalty|penalties|penalita)$/, 'Penalità'],
     [/^(codriver|navigator|navigatore)$/, 'Navigatore'], [/^(nationality|nation|country|nazione|nazionalita)$/, 'Nazione'], [/^(team|squadra)$/, 'Team'],
     [/^(totaltime|overalltime|tempototale)$/, 'Tempo totale'], [/^(points|punti)$/, 'Punti'], [/^(status|stato)$/, 'Stato']
@@ -1909,7 +1911,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   function crewCell(k, v) {
     if (v == null) return '–';
-    var c = /colou?r|colore/.test(crewNorm(k)) ? (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v) ? v : CREW_COLORS[crewNorm(v)]) : '';
+    var c = /colou?r|colore|usura|wear/.test(crewNorm(k)) ? (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v) ? v : (CREW_COLORS[crewNorm(v)] || CREW_COLORS[crewNorm(String(v).split(/[\s\-–:,(]+/)[0])])) : '';
     return (c ? '<i class="crew-sw" style="background:' + c + '"></i>' : '') + esc(v);
   }
   // Compare solo quando la tappa è finita, cioè quando la telemetria ha mandato la classifica di questa tappa
@@ -2296,9 +2298,14 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   function crewWear(txt) {
     var t = String(txt || '').toLowerCase().trim(), m = /^#?([0-9a-f]{6})$/.exec(t);
     if (m) { var R = parseInt(m[1].slice(0, 2), 16), G = parseInt(m[1].slice(2, 4), 16); return G > R * 1.3 ? 0 : (R > G * 1.5 ? 2 : 1); }
-    if (/giall|yellow|arancio|orange|\bmedi[ao]\b|\bmedium\b/.test(t)) return 1;
-    if (/verd|green|\bbass[ao]\b|\blow\b/.test(t)) return 0;
-    if (/ross|\bred\b|\balt[ao]\b|\bhigh\b/.test(t)) return 2;
+    // Colonna «Tyre Wear»: "VERDE - Nuove" → bassa, "GIALLO - Usurate" → media, "ROSSO - Molto Usurate" → alta.
+    // Prima il colore scritto, poi le parole: «Molto Usurate» non deve passare per «Usurate».
+    if (/ross|\bred\b/.test(t)) return 2;
+    if (/giall|yellow|arancio|orange/.test(t)) return 1;
+    if (/verd|green/.test(t)) return 0;
+    if (/molto usurat|\balt[ao]\b|\bhigh\b|very worn|consumat/.test(t)) return 2;
+    if (/usurat|\bworn\b|\bmedi[ao]\b|\bmedium\b/.test(t)) return 1;
+    if (/\bnuov[ei]\b|\bnew\b|\bbass[ao]\b|\blow\b/.test(t)) return 0;
     return null;
   }
   // Legge da una riga della classifica il tipo di gomma e il colore dell'usura finale
@@ -2324,7 +2331,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       var ty = crewTyreOf(r, x), old = my[x.did];
       if (ty.raw && !ty.t) unk.push(x.name + ' («' + ty.raw + '»)');
       if (ty.t) {
-        var nw = { t: ty.t, s: old && old.t === ty.t && typeof old.s === 'number' ? old.s : 0, w: ty.w !== null ? ty.w : (old && typeof old.w === 'number' ? old.w : 0) };
+        // l'usura iniziale non si tocca: resta quella già impostata per questo pilota
+        var nw = { t: ty.t, s: old && typeof old.s === 'number' ? old.s : 0, w: ty.w !== null ? ty.w : (old && typeof old.w === 'number' ? old.w : 0) };
         if (!old || old.a || old.t !== nw.t || old.w !== nw.w) { my[x.did] = nw; nG++; }
       } else if (ty.w !== null && old && (old.a || old.w !== ty.w)) { delete old.a; old.w = ty.w; nG++; }
     });
@@ -2414,7 +2422,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       '<div class="xt' + (v ? ' open' : '') + '"><button class="xt-btn warn-ico" type="button" data-action="xt-open" aria-expanded="' + (v ? 'true' : 'false') + '" aria-controls="' + id + '" aria-label="Penalità di ' + esc(d.name) + '" title="Penalità (secondi)">' +
         '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2.6 22.6 21H1.4z" fill="#d92d20" stroke="#d92d20" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="18" r="1.35" fill="#fff"/></svg></button>' +
         '<span class="xt-in"><input type="text" class="pn" id="' + id + '" value="' + (v ? esc(fmtTimeShort(v)) : '') + '" placeholder="es. 10 oppure 1:05.5" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Secondi di penalità di ' + esc(d.name) + '" data-change="pen" data-stage="' + sel.id + '" data-driver="' + d.id + '"><span class="mut">sec</span></span></div>' +
-      '<div class="xt xt-note' + (nt ? ' open' : '') + '"><button class="btn small ghost xt-btn" type="button" data-action="xt-open" aria-expanded="' + (nt ? 'true' : 'false') + '" aria-controls="' + nid + '">Note</button>' +
+      '<div class="xt xt-note' + (nt ? ' open' : '') + '"><button class="xt-btn warn-ico note-ico" type="button" data-action="xt-open" aria-expanded="' + (nt ? 'true' : 'false') + '" aria-controls="' + nid + '" aria-label="Note su ' + esc(d.name) + '" title="Note aggiuntive">' +
+        '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 3h10l4 4v14H5z"/><path d="M15 3v4h4"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4.5"/></svg></button>' +
         '<span class="xt-in"><input type="text" class="nt" id="' + nid + '" value="' + esc(nt) + '" placeholder="Note aggiuntive" maxlength="300" autocomplete="off" aria-label="Note su ' + esc(d.name) + '" data-change="note" data-stage="' + sel.id + '" data-driver="' + d.id + '"></span></div></div>';
   }
   function fmtTimeShort(ms) { return ms < 60000 ? String(ms / 1000).replace('.', ',') : fmtTime(ms); }
