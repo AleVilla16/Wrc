@@ -231,8 +231,6 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-leg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
 .tel-leg b, .tel-leg .tel-at { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3ch; }
 .tel-cv { display: block; width: 100%; height: 190px; touch-action: pan-y; cursor: crosshair; }
-.cap-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.cap-shot { display: block; max-width: 100%; max-height: 420px; border-radius: 10px; border: 1px solid var(--line); }
 .tel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 260px); gap: 18px; align-items: stretch; }
 @media (max-width: 760px) { .tel-body { grid-template-columns: minmax(0, 1fr); } }
 .tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
@@ -1841,58 +1839,38 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     Promise.resolve(cl.use('sample')).then(function (smp) {
       if (!smp || typeof smp.limits !== 'function') return;
       return Promise.resolve(smp.limits()).then(function (l) {
-        if (l && l.images) { scanCaps = { sample: smp, lim: l.images }; refreshScan(); capRefresh(); }
+        if (l && l.images) { scanCaps = { sample: smp, lim: l.images }; refreshScan(); }
       });
     }).catch(function () { /* funzione non disponibile: resta nascosta */ });
   }
-  /* ---------- Cattura dello schermo (risultati della prova) ---------- */
-  var cap = { stream: null, video: null, url: '', busy: false, msg: '' };
-  function capOk() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
-  function capHtml() {
-    var out = '<div class="tel" id="cap-area"><div class="tel-head"><h4>Cattura schermo</h4><span class="tel-st ' + (cap.stream ? 'on' : 'off') + '" role="status"><i></i><span>' + (cap.stream ? 'Schermo collegato' : 'Schermo non collegato') + '</span></span></div>';
-    if (!capOk()) return out + '<p class="hint">La cattura dello schermo funziona solo da computer (Chrome, Edge o Firefox). Da telefono usa «Scatta foto» qui sotto.</p></div>';
-    out += '<p class="hint">Cattura la schermata dei risultati della prova e leggo per ogni riga <b>Crew</b>, <b>pneumatici</b> (tipo e colore) e <b>tempo</b>. Alla prima cattura il browser chiede quale schermo condividere: scegli «Schermo 1». La scelta resta attiva finché non premi «Scollega schermo».</p>' +
-      '<div class="cap-acts"><button class="btn primary" type="button" data-action="cap-shot"' + (cap.busy ? ' disabled' : '') + '>' + (cap.stream ? 'Cattura e leggi' : 'Collega schermo e cattura') + '</button>' +
-      (cap.stream ? '<button class="btn" type="button" data-action="cap-stop">Scollega schermo</button>' : '') + '</div>';
-    if (cap.msg) out += '<p class="warn" role="alert">' + esc(cap.msg) + '</p>';
-    if (cap.url) out += '<a href="' + cap.url + '" target="_blank" rel="noopener" title="Apri la schermata a grandezza piena"><img class="cap-shot" src="' + cap.url + '" alt="Ultima schermata catturata"></a>' +
-      (scanCaps ? '<p class="hint">I dati letti compaiono qui sotto in «Leggi da foto»: controllali e premi «Applica a questa tappa».</p>' : '<p class="warn">Schermata catturata, ma in questa versione dell’app la lettura automatica delle immagini non è disponibile: copia i dati a mano nella tabella qui sotto.</p>');
-    return out + '</div>';
+  /* ---------- Dati delle crew a fine tappa (arrivano dalla telemetria) ---------- */
+  var crewData = {};
+  try { crewData = JSON.parse(localStorage.getItem('rally-tel-crew') || '{}') || {}; } catch (e) { crewData = {}; }
+  function crewSave(key, rows) {
+    if (rows) crewData[key] = { at: Date.now(), rows: rows }; else delete crewData[key];
+    var ks = Object.keys(crewData).sort(function (a, b) { return crewData[b].at - crewData[a].at; });
+    ks.slice(40).forEach(function (k) { delete crewData[k]; });
+    try { localStorage.setItem('rally-tel-crew', JSON.stringify(crewData)); } catch (e) { /* ignora */ }
   }
-  function capRefresh() { setHtml('cap-wrap', capHtml()); }
-  function capStop() {
-    if (cap.stream) cap.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) { /* ignora */ } });
-    cap.stream = null; cap.video = null;
-  }
-  function capStart() {
-    if (cap.stream) return Promise.resolve();
-    return navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: 'monitor' }, audio: false }).then(function (st) {
-      var v = document.createElement('video');
-      v.muted = true; v.playsInline = true; v.srcObject = st;
-      cap.stream = st; cap.video = v;
-      st.getVideoTracks()[0].addEventListener('ended', function () { if (cap.stream === st) { capStop(); capRefresh(); } });
-      return v.play().then(function () { return new Promise(function (ok) { setTimeout(ok, 400); }); });   // aspetta il primo fotogramma
-    });
-  }
-  function capShot() {
-    if (cap.busy) return;
-    cap.busy = true; cap.msg = ''; capRefresh();
-    capStart().then(function () {
-      var v = cap.video, w = v && v.videoWidth, h = v && v.videoHeight;
-      if (!w || !h) throw new Error('vuoto');
-      var c = document.createElement('canvas'); c.width = w; c.height = h;
-      c.getContext('2d').drawImage(v, 0, 0, w, h);
-      return new Promise(function (ok, ko) { c.toBlob(function (b) { if (b) ok(b); else ko(new Error('vuoto')); }, 'image/png'); });
-    }).then(function (blob) {
-      if (cap.url) { try { URL.revokeObjectURL(cap.url); } catch (e) { /* ignora */ } }
-      cap.url = URL.createObjectURL(blob);
-      cap.busy = false; capRefresh();
-      if (scanCaps) runScan([new File([blob], 'schermo.png', { type: 'image/png' })]);
-    }).catch(function (e) {
-      cap.busy = false;
-      cap.msg = e && (e.name === 'NotAllowedError' || e.name === 'AbortError') ? 'Cattura annullata: per leggere la schermata devi scegliere lo schermo da condividere.' : 'Non sono riuscito a catturare lo schermo. Riprova.';
-      capRefresh();
-    });
+  function crewLabel(k) { var t = String(k).replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); return t.charAt(0).toUpperCase() + t.slice(1); }
+  // Compare solo quando la tappa è finita, cioè quando la telemetria ha mandato i risultati di questa tappa
+  function crewHtml(r, sel) {
+    var rec = crewData[r.id + '|' + sel.id];
+    if (!rec || !rec.rows || !rec.rows.length) return '';
+    var rows = rec.rows.slice().sort(function (a, b) { return (a.v === 'R' ? Infinity : a.v) - (b.v === 'R' ? Infinity : b.v); });
+    var best = typeof rows[0].v === 'number' ? rows[0].v : null, cols = [];
+    rows.forEach(function (x) { Object.keys(x.ex || {}).forEach(function (k) { if (cols.indexOf(k) < 0 && cols.length < 6) cols.push(k); }); });
+    var byId = {}; state.drivers.forEach(function (d) { byId[d.id] = d; });
+    return '<div class="tel" id="crew-area"><div class="tel-head"><h4>Crew a fine tappa</h4><span class="hint">' + plural(rows.length, 'crew', 'crew') + ' · dati ricevuti dalla telemetria</span></div>' +
+      '<div class="tablewrap"><table class="cls"><thead><tr><th scope="col">#</th><th scope="col">Crew</th><th scope="col">Pilota abbinato</th><th class="num" scope="col">Tempo</th><th class="num" scope="col">Distacco</th>' +
+      cols.map(function (k) { return '<th scope="col">' + esc(crewLabel(k)) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (x, i) {
+        var d = byId[x.did], out = x.v === 'R';
+        return '<tr><td class="num">' + (out ? '–' : i + 1) + '</td><td><b>' + esc(x.name) + '</b>' + (x.me ? ' <span class="tag acc">Tu</span>' : '') + '</td><td>' + (d ? esc(d.name) : '<span class="mut">non abbinato</span>') + '</td>' +
+          '<td class="num">' + (out ? 'RIT' : esc(fmtTime(x.v))) + '</td><td class="num">' + (out || best === null ? '–' : (x.v === best ? '—' : '+' + esc((x.v - best) < 60000 ? ((x.v - best) / 1000).toFixed(3).replace('.', ',') : fmtTime(x.v - best)))) + '</td>' +
+          cols.map(function (k) { return '<td>' + esc(x.ex && x.ex[k] != null ? x.ex[k] : '–') + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="actions"><button class="btn small ghost" type="button" data-action="crew-clear" data-key="' + esc(r.id + '|' + sel.id) + '">Nascondi</button></div></div>';
   }
 
   /* ---------- Telemetria in diretta via WebSocket ---------- */
@@ -2099,7 +2077,14 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         var nm = telField(x, TEL_KEYS.name), dnf = telField(x, TEL_KEYS.dnf), st = telField(x, ['status', 'stato']);
         if (typeof nm !== 'string' || !nm.trim()) return;
         var out = dnf === true || dnf === 1 || /^(dnf|rit|ritir|retired)/i.test(String(st || '')) ? 'R' : telMs(telField(x, TEL_KEYS.rtime));
-        if (out !== null) rows.push({ name: nm, v: out });
+        if (out === null) return;
+        var ex = {}, skip = TEL_KEYS.name.concat(TEL_KEYS.rtime, TEL_KEYS.dnf);
+        Object.keys(x).forEach(function (k) {
+          var val = x[k], kk = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (skip.indexOf(kk) >= 0 || val === null || val === '' || typeof val === 'object') return;
+          ex[k] = typeof val === 'boolean' ? (val ? 'Sì' : 'No') : String(val).slice(0, 40);
+        });
+        rows.push({ name: nm, v: out, ex: ex });
       });
       return rows.length ? rows : null;
     }
@@ -2130,8 +2115,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (tel.me && state.drivers.some(function (d) { return d.id === tel.me; })) put(tel.me, mine);
       else miss.push('il tuo tempo (scegli «Il mio pilota»)');
     }
-    rows.forEach(function (x) { var did = matchDriver(state, r, x.name); if (did) put(did, x.v); else miss.push(x.name); });
-    if (n) { cleanup(r.id); commit(); }
+    var crew = [];
+    if (mine !== null) crew.push({ name: (state.drivers.filter(function (d) { return d.id === tel.me; })[0] || {}).name || 'Tu', v: mine, did: seen[tel.me] ? tel.me : '', me: 1, ex: {} });
+    rows.forEach(function (x) {
+      var did = matchDriver(state, r, x.name);
+      if (did && did === tel.me && mine !== null) { crew[0].ex = x.ex; crew[0].name = x.name; return; }   // la mia riga è già in elenco
+      crew.push({ name: x.name, v: x.v, did: did || '', ex: x.ex });
+      if (did) put(did, x.v); else miss.push(x.name);
+    });
+    crewSave(r.id + '|' + sel.id, crew);
+    if (n) { cleanup(r.id); commit(); } else setHtml('crew-wrap', crewHtml(r, sel));
     if (n || miss.length) toast((n ? 'Telemetria: ' + plural(n, 'tempo inserito', 'tempi inseriti') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Telemetria: nessun tempo inserito.') + (miss.length ? ' Non abbinati: ' + miss.join(', ') + '.' : ''));
   }
   function telPick(flat, names) { for (var i = 0; i < names.length; i++) if (names[i] in flat) return flat[names[i]]; return null; }
@@ -2187,7 +2180,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     cl.forEach(function (x) { pm[x.d.id] = x.status === 'ok' ? x.pos : (x.status === 'R' ? 'RIT' : '–'); });
     var tyres = tyresOf(r), weekend = sel.day === 'sab' || sel.day === 'dom';
     var note = '<p class="hint">Ordine dei piloti: ' + (weekend ? 'classifica generale dell’evento prima di questa tappa' : 'classifica del campionato') + '. Gomme disponibili: ' + esc(tyres.map(function (t) { return t[1]; }).join(', ')) + ' (si cambiano modificando l’evento). Le penalità non cambiano la classifica della prova né i punti della Power Stage: si sommano al tempo nelle classifiche di giornata e generale.</p>';
-    return telHtml(sel) + (s === state ? '<div id="cap-wrap">' + capHtml() + '</div>' : '') + note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
+    return telHtml(sel) + '<div id="crew-wrap">' + crewHtml(r, sel) + '</div>' + note + '<div id="scan-area">' + scanHtml(s, r, sel) + '</div><div class="tablewrap"><table class="entry cls"><thead><tr><th scope="col">#</th><th scope="col">Pilota</th><th class="num" scope="col">Tempo</th></tr></thead><tbody>' + entryOrder(s, r, sel).map(function (d) {
       var id = 'tm-' + sel.id + '-' + d.id, ty = 'ty-' + sel.id + '-' + d.id, rec = tyreRec(s, r.id, sel.id, d.id);
       var opts = '<option value="">Gomme: —</option>' + TYRES.concat(rec && !TYRES.some(function (t) { return t[0] === rec.t; }) ? [[rec.t, tyreLabel(rec.t)]] : []).filter(function (t) { return tyres.indexOf(t) >= 0 || (rec && rec.t === t[0]); }).map(function (t) { return '<option value="' + t[0] + '"' + (rec && rec.t === t[0] ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('');
       return '<tr class="pair"><td class="posc"><span data-pos="' + d.id + '">' + (pm[d.id] === undefined ? '–' : pm[d.id]) + '</span></td><td>' + drvCell(d) + (absent(r, d.id) ? '<small class="mut">Non partecipa al campionato</small>' : '') + '</td>' +
@@ -3444,8 +3437,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     },
     'tel-disconnect': function () { telClose(); render(); },
     'tel-test': function () { var was = tel.snd; tel.snd = true; telBeep(1); setTimeout(function () { telBeep(2); tel.snd = was; }, 700); },
-    'cap-shot': function () { capShot(); },
-    'cap-stop': function () { capStop(); cap.msg = ''; capRefresh(); },
+    'crew-clear': function (el) { crewSave(el.dataset.key, null); setHtml('crew-wrap', ''); },
     'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
