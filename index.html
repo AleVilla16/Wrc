@@ -222,13 +222,16 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-me { display: grid; grid-template-columns: auto minmax(0, 260px); gap: 6px 10px; align-items: center; }
 .tel-me label { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .tel-me .hint { grid-column: 1 / -1; }
-.tel-charts { display: flex; flex-direction: column; gap: 14px; }
-.tel-chead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
-.tel-chead h5 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); display: inline-flex; align-items: center; gap: 8px; }
-.tel-chead h5 i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
-.tel-chead span { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 15px; color: var(--ink); min-height: 1.4em; }
-.tel-cv { display: block; width: 100%; height: 150px; touch-action: pan-y; cursor: crosshair; }
-.tel-body { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: stretch; }
+.tel-chart { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tel-chead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 14px; }
+.tel-chead h5 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.tel-leg { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--ink-2); }
+.tel-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.tel-leg i { width: 14px; height: 3px; border-radius: 2px; flex: none; }
+.tel-leg b, .tel-leg .tel-at { font-family: var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ink); min-width: 3ch; }
+.tel-cv { display: block; width: 100%; height: 190px; touch-action: pan-y; cursor: crosshair; }
+.tel-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 260px); gap: 18px; align-items: stretch; }
+@media (max-width: 760px) { .tel-body { grid-template-columns: minmax(0, 1fr); } }
 .tel-pedals { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
 .tel-ped .tel-lbl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .tel-ped .tel-lbl b { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 22px; letter-spacing: 0; color: var(--ink); }
@@ -236,12 +239,19 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-track span { display: block; height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); }
 .tel-thr span { background: var(--good); }
 .tel-brk span { background: var(--bad); }
-.tel-dist { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 92px; }
-.tel-vbar { flex: 1; min-height: 150px; width: 34px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); overflow: hidden; display: flex; align-items: flex-end; }
-.tel-vbar span { display: block; width: 100%; height: 100%; background: var(--good); transform-origin: center bottom; transform: scaleY(0); }
-.tel-dist .tel-cap { font-family: var(--f-display); font-weight: 600; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
-.tel-dist .tel-km { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 15px; text-align: center; line-height: 1.25; }
-.tel-dist .tel-km b { font-size: 20px; color: var(--good); }
+.tel-dist { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tel-dhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.tel-dist .tel-cap { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.tel-dist .tel-km { font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 16px; }
+.tel-dist .tel-km b { font-size: 22px; color: var(--ink); }
+.tel-hbar { position: relative; height: 26px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+.tel-hbar .fill { position: absolute; inset: 0; border-radius: 7px; overflow: hidden; }
+.tel-hbar .fill span { display: block; width: 100%; height: 100%; background: var(--good); transform-origin: left center; transform: scaleX(0); }
+.tel-hbar .mid { position: absolute; left: 50%; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--bg); }
+.tel-hbar .tk { position: absolute; top: 4px; bottom: 4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: .75; box-shadow: 0 0 0 1px var(--bg); }
+.tel-dscale { position: relative; height: 1.3em; font-family: var(--f-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink-2); }
+.tel-dscale span { position: absolute; top: 0; }
+.tel-dscale .s0 { left: 0; } .tel-dscale .s1 { left: 50%; transform: translateX(-50%); } .tel-dscale .s2 { right: 0; }
 .filebtn { position: relative; overflow: hidden; }
 .filebtn .filein { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; font-size: 0; }
 .filebtn:focus-within { outline: 3px solid var(--focus); outline-offset: 2px; }
@@ -1859,13 +1869,13 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       (live ? '<button class="btn" type="button" data-action="tel-disconnect">Scollega</button>' : '<button class="btn primary" type="button" data-action="tel-connect">Collega</button>') + '</div>' +
       '<div class="tel-me"><label for="tel-me">Il mio pilota</label><select id="tel-me" data-change="tel-me"><option value="">— scegli —</option>' + (state && state.drivers ? state.drivers : []).map(function (d) { return '<option value="' + d.id + '"' + (d.id === tel.me ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select>' +
       '<span class="hint">A fine speciale il tuo tempo va a questo pilota e quelli degli avversari ai piloti con lo stesso nome equivalente.</span></div>' +
-      '<div class="tel-body"><div class="tel-pedals">' +
+      '<div class="tel-body"><div class="tel-chart"><div class="tel-chead"><h5>Ultimi 2 km</h5><div class="tel-leg"><span><i style="background:var(--good)"></i>Acceleratore <b id="tel-ct-v"></b></span><span><i style="background:var(--bad)"></i>Freno <b id="tel-cb-v"></b></span><span class="tel-at" id="tel-c-at"></span></div></div>' +
+      '<canvas class="tel-cv" id="tel-c" role="img" aria-label="Grafico: acceleratore e pressione del freno in percentuale negli ultimi 2 km percorsi"></canvas>' +
+      '<div class="actions"><button class="btn small ghost" type="button" data-action="tel-clear">Azzera grafico</button></div></div><div class="tel-pedals">' +
       '<div class="tel-ped"><div class="tel-lbl"><span>Acceleratore</span><b id="tel-thr-v">0%</b></div><div class="tel-track tel-thr"><span id="tel-thr"></span></div></div>' +
       '<div class="tel-ped"><div class="tel-lbl"><span>Freno</span><b id="tel-brk-v">0%</b></div><div class="tel-track tel-brk"><span id="tel-brk"></span></div></div></div>' +
-      '<div class="tel-dist"><span class="tel-cap">Tappa</span><div class="tel-vbar" id="tel-bar-box" role="progressbar" aria-label="Km percorsi nella tappa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="tel-bar"></span></div><div class="tel-km" id="tel-km">–</div></div></div>' +
-      '<div class="tel-charts">' + [['t', 'Acceleratore', '--good'], ['b', 'Pressione freno', '--bad']].map(function (c) {
-        return '<div><div class="tel-chead"><h5><i style="background:var(' + c[2] + ')"></i>' + c[1] + ' (%) sulla distanza</h5><span id="tel-c' + c[0] + '-v"></span></div><canvas class="tel-cv" id="tel-c' + c[0] + '" data-k="' + c[0] + '" role="img" aria-label="Grafico: ' + c[1] + ' in percentuale lungo la distanza della tappa"></canvas></div>';
-      }).join('') + '<div class="actions"><button class="btn small ghost" type="button" data-action="tel-clear">Azzera grafici</button></div></div>' +
+      '<div class="tel-dist"><div class="tel-dhead"><span class="tel-cap">Tappa</span><span class="tel-km" id="tel-km">–</span></div><div class="tel-hbar" id="tel-bar-box" role="progressbar" aria-label="Km percorsi nella tappa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="fill"><span id="tel-bar"></span></div><span id="tel-ticks"></span><i class="mid" title="Metà tappa"></i></div>' +
+      '<div class="tel-dscale"><span class="s0">0</span><span class="s1" id="tel-mid">metà</span><span class="s2" id="tel-end"></span></div></div></div>' +
       '<p class="hint">La lunghezza della tappa arriva dalla telemetria' + (km ? '; finché non arriva vale quella scritta nella tappa (' + esc(fmtKm(km)) + ').' : '.') + '</p>' + (km ? '' : '<p class="hint" id="tel-nokm">In attesa della lunghezza della tappa dalla telemetria: finché non arriva la barra non può mostrare l’avanzamento.</p>') + '</div>';
   }
   function telNum(v) { return Math.round(v * 100) / 100; }
@@ -1882,10 +1892,19 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var done = tel.dist !== null ? (tel.unit === 'km' ? tel.dist : tel.dist / 1000) : (tel.prog !== null && km ? tel.prog * km : null);
     var frac = km && done !== null ? done / km : (tel.prog !== null ? tel.prog : 0);
     frac = Math.max(0, Math.min(1, frac));
-    document.getElementById('tel-bar').style.transform = 'scaleY(' + frac + ')';
+    document.getElementById('tel-bar').style.transform = 'scaleX(' + frac + ')';
+    // Segni piccoli: la tappa si divide in 4 parti sotto i 10 km, 6 da 10 a 15, 8 fino a 20, 10 oltre i 20
+    var parts = !km ? 0 : km < 10 ? 4 : km <= 15 ? 6 : km <= 20 ? 8 : 10, tk = document.getElementById('tel-ticks');
+    if (tk && tk.dataset.n !== String(parts)) {
+      tk.dataset.n = parts;
+      for (var th = '', ti = 1; ti < parts; ti++) if (ti * 2 !== parts) th += '<i class="tk" style="left:' + (ti / parts * 100) + '%"></i>';
+      tk.innerHTML = th;
+    }
+    document.getElementById('tel-mid').textContent = km ? 'metà · ' + String(telNum(km / 2)).replace('.', ',') + ' km' : 'metà';
+    document.getElementById('tel-end').textContent = km ? String(telNum(km)).replace('.', ',') + ' km' : '';
     document.getElementById('tel-bar-box').setAttribute('aria-valuenow', Math.round(frac * 100));
     document.getElementById('tel-km').innerHTML = done === null ? (km ? '– / ' + telNum(km) + ' km' : '–') :
-      '<b>' + telNum(Math.max(0, done)).toFixed(2) + '</b>' + (km ? '<br>di ' + telNum(km) + ' km<br>' + Math.round(frac * 100) + '%' : ' km');
+      '<b>' + telNum(Math.max(0, done)).toFixed(2).replace('.', ',') + '</b>' + (km ? ' di ' + String(telNum(km)).replace('.', ',') + ' km · ' + Math.round(frac * 100) + '%' : ' km');
     telCharts(km);
   }
   // Traccia registrata: un punto ogni 2 metri circa; se la distanza torna indietro (nuova partenza) riparte da zero
@@ -1900,49 +1919,54 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   }
   function telX(p, km) { return tel.tr.mode === 'p' ? p.x * (km || 100) : (tel.unit === 'km' ? p.x : p.x / 1000); }
   function telCharts(km) {
-    var cs = getComputedStyle(document.documentElement), pts = tel.tr.pts;
+    var cv = document.getElementById('tel-c');
+    if (!cv) return;
+    var cs = getComputedStyle(document.documentElement), pts = tel.tr.pts, WIN = 2;
     var ink2 = cs.getPropertyValue('--ink-2').trim() || '#888', line = cs.getPropertyValue('--line').trim() || '#444', surf = cs.getPropertyValue('--bg').trim() || '#000';
-    var pctX = tel.tr.mode === 'p' && !km, maxX = km || (pctX ? 100 : 1);
-    if (!km && pts.length) maxX = Math.max(maxX, telX(pts[pts.length - 1], km));
-    var raw = maxX / 5, mag = Math.pow(10, Math.floor(Math.log(raw) / Math.LN10)), tick = [1, 2, 5, 10].map(function (m) { return m * mag; }).filter(function (v) { return v >= raw; })[0];
-    // punto più vicino al cursore
-    var hp = null;
+    var pctX = tel.tr.mode === 'p' && !km;               // solo avanzamento in % e nessuna lunghezza: niente km, mostra tutto
+    var cur = pts.length ? telX(pts[pts.length - 1], km) : 0;
+    var x0 = pctX ? 0 : Math.max(0, cur - WIN), span = pctX ? 100 : WIN, tick = pctX ? 20 : 0.5;
+    var hp = null, i0 = 0, lo, hi, mid;
+    if (!pctX && pts.length) { lo = 0; hi = pts.length - 1; while (lo < hi) { mid = (lo + hi) >> 1; if (telX(pts[mid], km) < x0) lo = mid + 1; else hi = mid; } i0 = Math.max(0, lo - 1); }
     if (tel.hover !== null && pts.length) {
-      var hx = tel.hover * maxX, lo = 0, hi = pts.length - 1;
-      while (lo < hi) { var mid = (lo + hi) >> 1; if (telX(pts[mid], km) < hx) lo = mid + 1; else hi = mid; }
-      hp = lo > 0 && Math.abs(telX(pts[lo - 1], km) - hx) < Math.abs(telX(pts[lo], km) - hx) ? pts[lo - 1] : pts[lo];
+      var hx = x0 + tel.hover * span; lo = i0; hi = pts.length - 1;
+      while (lo < hi) { mid = (lo + hi) >> 1; if (telX(pts[mid], km) < hx) lo = mid + 1; else hi = mid; }
+      hp = lo > i0 && Math.abs(telX(pts[lo - 1], km) - hx) < Math.abs(telX(pts[lo], km) - hx) ? pts[lo - 1] : pts[lo];
     }
-    [['t', '--good'], ['b', '--bad']].forEach(function (c) {
-      var cv = document.getElementById('tel-c' + c[0]), out = document.getElementById('tel-c' + c[0] + '-v');
-      if (!cv) return;
-      var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
-      if (!w || !h) return;
-      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
-      var g = cv.getContext('2d'), L = 38, R = 10, T = 8, B = 22, pw = w - L - R, ph = h - T - B, col = cs.getPropertyValue(c[1]).trim() || '#4cc38a';
-      function X(v) { return L + v / maxX * pw; }
-      function Y(v) { return T + (1 - v) * ph; }
-      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
-      g.font = '13px "Barlow Condensed", "Arial Narrow", sans-serif'; g.fillStyle = ink2; g.strokeStyle = line; g.lineWidth = 1;
-      g.textAlign = 'right'; g.textBaseline = 'middle';
-      [0, .5, 1].forEach(function (v) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(Math.round(v * 100) + '%', L - 6, y); });
-      g.textAlign = 'center'; g.textBaseline = 'top';
-      for (var v = 0; v <= maxX + 1e-9; v += tick) g.fillText(String(Math.round(v * 100) / 100).replace('.', ',') + (pctX ? '%' : ''), X(v), h - B + 6);
-      g.textAlign = 'right'; g.fillText(pctX ? '' : 'km', w - 2, h - B + 6);
-      if (pts.length) {
-        g.save(); g.beginPath(); g.rect(L, T - 2, pw, ph + 4); g.clip();
-        g.beginPath(); g.strokeStyle = col; g.lineWidth = 2; g.lineJoin = 'round';
-        pts.forEach(function (p, i) { var x = X(telX(p, km)), y = Y(p[c[0]]); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
-        g.stroke(); g.restore();
-      } else { g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('In attesa dei dati della telemetria', L + pw / 2, T + ph / 2); }
-      if (hp) {
-        var px = X(telX(hp, km)), py = Y(hp[c[0]]);
-        g.strokeStyle = ink2; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(px) + .5, T); g.lineTo(Math.round(px) + .5, T + ph); g.stroke();
-        g.beginPath(); g.arc(px, py, 6, 0, Math.PI * 2); g.fillStyle = surf; g.fill();
-        g.beginPath(); g.arc(px, py, 4, 0, Math.PI * 2); g.fillStyle = col; g.fill();
-      }
-      var show = hp || pts[pts.length - 1];
-      if (out) out.textContent = show ? (pctX ? telNum(telX(show, km)).toFixed(1).replace('.', ',') + '% della tappa' : telNum(telX(show, km)).toFixed(2).replace('.', ',') + ' km') + ' · ' + Math.round(show[c[0]] * 100) + '%' : '';
-    });
+    var w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var g = cv.getContext('2d'), L = 38, R = 10, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
+    function X(v) { return L + (v - x0) / span * pw; }
+    function Y(v) { return T + (1 - v) * ph; }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    g.font = '13px "Barlow Condensed", "Arial Narrow", sans-serif'; g.fillStyle = ink2; g.strokeStyle = line; g.lineWidth = 1;
+    g.textAlign = 'right'; g.textBaseline = 'middle';
+    [0, .5, 1].forEach(function (v) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke(); g.fillText(Math.round(v * 100) + '%', L - 6, y); });
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    for (var v = Math.ceil(x0 / tick - 1e-9) * tick; v <= x0 + span + 1e-9; v += tick) g.fillText(String(Math.round(v * 100) / 100).replace('.', ',') + (pctX ? '%' : ''), X(v), h - B + 6);
+    if (!pctX) { g.textAlign = 'right'; g.fillText('km', w - 2, h - B + 6); }
+    if (pts.length) {
+      g.save(); g.beginPath(); g.rect(L, T - 2, pw, ph + 4); g.clip();
+      [['b', '--bad'], ['t', '--good']].forEach(function (c) {
+        g.beginPath(); g.strokeStyle = cs.getPropertyValue(c[1]).trim() || '#888'; g.lineWidth = 2; g.lineJoin = 'round';
+        for (var i = i0; i < pts.length; i++) { var x = X(telX(pts[i], km)), y = Y(pts[i][c[0]]); if (i > i0) g.lineTo(x, y); else g.moveTo(x, y); }
+        g.stroke();
+      });
+      g.restore();
+    } else { g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('In attesa dei dati della telemetria', L + pw / 2, T + ph / 2); }
+    if (hp) {
+      var px = X(telX(hp, km));
+      g.strokeStyle = ink2; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.round(px) + .5, T); g.lineTo(Math.round(px) + .5, T + ph); g.stroke();
+      [['b', '--bad'], ['t', '--good']].forEach(function (c) {
+        g.beginPath(); g.arc(px, Y(hp[c[0]]), 6, 0, Math.PI * 2); g.fillStyle = surf; g.fill();
+        g.beginPath(); g.arc(px, Y(hp[c[0]]), 4, 0, Math.PI * 2); g.fillStyle = cs.getPropertyValue(c[1]).trim() || '#888'; g.fill();
+      });
+    }
+    var show = hp || pts[pts.length - 1], et = document.getElementById('tel-ct-v'), eb = document.getElementById('tel-cb-v'), ea = document.getElementById('tel-c-at');
+    if (et) et.textContent = show ? Math.round(show.t * 100) + '%' : '';
+    if (eb) eb.textContent = show ? Math.round(show.b * 100) + '%' : '';
+    if (ea) ea.textContent = show ? 'a ' + (pctX ? telNum(telX(show, km)).toFixed(1).replace('.', ',') + '%' : telNum(telX(show, km)).toFixed(2).replace('.', ',') + ' km') : '';
   }
   function telHover(e) {
     var cv = e.target && e.target.classList && e.target.classList.contains('tel-cv') ? e.target : null, v = null;
