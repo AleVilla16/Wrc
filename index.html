@@ -534,8 +534,16 @@ img.tlogo.big { width: auto; height: 46px; max-width: 112px; }
 .wb[aria-pressed="true"] i { opacity: 1; }
 .wb:disabled { opacity: .3; cursor: not-allowed; }
 .wb.w0 { --wc: #2fbf71; } .wb.w1 { --wc: #f2c230; } .wb.w2 { --wc: #e5484d; }
-.pen { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13px; }
-.pen input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
+.xtra { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 6px; font-size: 13px; flex: 1 1 100%; }
+.xt { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.xt-note { flex: 1 1 220px; }
+.xt .xt-in { display: none; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+.xt.open .xt-in { display: flex; }
+.warn-ico { background: none; border: 0; padding: 4px; margin: 0; border-radius: 8px; cursor: pointer; display: inline-flex; line-height: 0; min-width: 36px; min-height: 36px; align-items: center; justify-content: center; }
+.warn-ico:hover { background: var(--surface-2); }
+.warn-ico:disabled { opacity: .5; cursor: default; }
+.xt input.nt { width: 100%; min-width: 0; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; }
+.xt input.pn { width: 9.5em; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; min-height: 36px; text-align: right; }
 .penb { color: #b3261e; font-weight: 600; }
 fieldset.tyres { border: 0; padding: 0; margin: 0; min-width: 0; }
 fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
@@ -1939,7 +1947,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
           '<td class="num">' + (out ? 'RIT' : none ? '–' : esc(fmtTime(x.v))) + '</td><td class="num">' + (out || none || best === null ? '–' : (x.v === best ? '—' : '+' + esc((x.v - best) < 60000 ? ((x.v - best) / 1000).toFixed(3).replace('.', ',') : fmtTime(x.v - best)))) + '</td>' +
           cols.map(function (k) { return '<td>' + crewCell(k, x.ex ? x.ex[k] : null) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table></div>' +
-      '<p class="hint">Scegli tu il pilota di ogni crew nella colonna «Pilota abbinato». Questi dati sono solo mostrati: nella tabella dei tempi non viene scritto nulla finché non premi «Inserisci i tempi nella tappa» (vale per le crew abbinate a un pilota).</p>' +
+      '<p class="hint">Scegli tu il pilota di ogni crew nella colonna «Pilota abbinato». Questi dati sono solo mostrati: nella tappa non viene scritto nulla finché non premi «Inserisci i tempi nella tappa», che copia tempo, tipo di gomma e usura finale delle crew abbinate a un pilota.</p>' +
       '<div class="actions"><button class="btn small" type="button" data-action="crew-apply" data-key="' + esc(r.id + '|' + sel.id) + '"' + (rows.some(function (x) { return x.did && x.v !== null; }) ? '' : ' disabled') + '>Inserisci i tempi nella tappa</button>' +
       tools + '</div></div>';
   }
@@ -2258,18 +2266,70 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     setHtml('crew-wrap', crewHtml(r, sel));
     if (before !== crew.length) toast('Telemetria: classifica ricevuta per ' + (labelsOf(r)[sel.id] || 'questa tappa') + ' (' + plural(crew.length, 'crew', 'crew') + '). Nessun dato è stato inserito in automatico.');
   }
+  // Penalità e note: uscendo dal campo, se è rimasto vuoto si richiude
+  document.addEventListener('focusout', function (e) {
+    var inp = e.target, box = inp && inp.closest ? inp.closest('.xt') : null;
+    if (!box || inp.tagName !== 'INPUT') return;
+    setTimeout(function () {
+      if (inp.value.trim() || document.activeElement === inp || !box.isConnected) return;
+      box.classList.remove('open'); box.dataset.shut = Date.now();
+      var b = box.querySelector('.xt-btn'); if (b) b.setAttribute('aria-expanded', 'false');
+    }, 120);
+  });
   function crewShow() { var r = ui.manage && findRally(state, ui.manage), sel = r && selStage(r); if (r && sel) setHtml('crew-wrap', crewHtml(r, sel)); }
   // Inserimento a mano: copia nella tappa i tempi delle crew abbinate a un pilota
+  // Tipo di gomma scritto dalla telemetria → una delle gomme dell'app (se la superficie non è scritta, vale quella dell'evento)
+  function crewTyre(r, txt) {
+    var t = ' ' + String(txt || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, ' ') + ' ', avail = tyresOf(r).map(function (q) { return q[0]; });
+    if (!t.trim()) return '';
+    for (var i = 0; i < TYRES.length; i++) if (t.trim() === TYRES[i][0] || t.trim() === TYRES[i][1].toLowerCase()) return TYRES[i][0];
+    if (/ (snow|neve|winter|invern\w*|chiodat\w*|studded) /.test(t)) return 'neve';
+    var surf = / (gravel|sterrato|terra|dirt|ste) /.test(t) ? 'ste' : (/ (tarmac|asphalt|asfalto|asf) /.test(t) ? 'asf' : '');
+    var comp = / (wet|rain|pioggia|bagnato|rainy) /.test(t) ? 'p' : / (soft|morbid\w*|s) /.test(t) ? 's' : / (medium|medi\w*|m) /.test(t) ? 'm' : / (hard|dur\w*|h|d) /.test(t) ? 'd' : '';
+    if (!comp) return '';
+    if (comp === 'p') return 'asf-p';
+    if (surf) return surf + '-' + comp;
+    var fit = avail.filter(function (k) { return k.slice(-2) === '-' + comp; });      // superficie non scritta: quella delle gomme dell'evento
+    return fit[0] || ((r.surface || 'asfalto') === 'sterrato' ? 'ste-' : 'asf-') + comp;
+  }
+  // Colore dell'usura → 0 verde (bassa), 1 gialla (media), 2 rossa (alta)
+  function crewWear(txt) {
+    var t = String(txt || '').toLowerCase().trim(), m = /^#?([0-9a-f]{6})$/.exec(t);
+    if (m) { var R = parseInt(m[1].slice(0, 2), 16), G = parseInt(m[1].slice(2, 4), 16); return G > R * 1.3 ? 0 : (R > G * 1.5 ? 2 : 1); }
+    if (/giall|yellow|arancio|orange|\bmedi[ao]\b|\bmedium\b/.test(t)) return 1;
+    if (/verd|green|\bbass[ao]\b|\blow\b/.test(t)) return 0;
+    if (/ross|\bred\b|\balt[ao]\b|\bhigh\b/.test(t)) return 2;
+    return null;
+  }
+  // Legge da una riga della classifica il tipo di gomma e il colore dell'usura finale
+  function crewTyreOf(r, x) {
+    var out = { t: '', w: null, raw: '' }, ks = Object.keys(x.ex || {}), isTy = /tyre|tire|pneumatic|gomm|compound|mescola/, isCol = /colou?r|colore|usura|wear/;
+    ks.forEach(function (k) { var n = crewNorm(k); if (!out.t && isTy.test(n) && !isCol.test(n)) { out.raw = x.ex[k]; out.t = crewTyre(r, x.ex[k]); } });
+    ks.forEach(function (k) { var n = crewNorm(k); if (out.w === null && isCol.test(n) && isTy.test(n)) out.w = crewWear(x.ex[k]); });
+    ks.forEach(function (k) { var n = crewNorm(k); if (out.w === null && isCol.test(n)) out.w = crewWear(x.ex[k]); });
+    return out;
+  }
+  // Inserimento a mano: copia nella tappa tempo, tipo di gomma e usura finale delle crew abbinate a un pilota
   function crewApply(key) {
     var r = ui.manage && findRally(state, ui.manage), sel = r && selStage(r), rec = crewData[key];
     if (!r || !sel || !rec || key !== r.id + '|' + sel.id) return;
     if (r.locked || arcOn()) { toast('Evento bloccato: i tempi non si possono modificare.'); return; }
     var res = state.results[r.id] = state.results[r.id] || { pos: {} };
-    res.times = res.times || {};
-    var mt = res.times[sel.id] = res.times[sel.id] || {}, n = 0, seen = {};
-    rec.rows.forEach(function (x) { if (!x.did || x.v === null || seen[x.did]) return; seen[x.did] = 1; if (mt[x.did] !== x.v) { mt[x.did] = x.v; n++; } });
-    if (n) { cleanup(r.id); commit(); }
-    toast(n ? plural(n, 'tempo inserito', 'tempi inseriti') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Nessun tempo nuovo da inserire.');
+    res.times = res.times || {}; res.tyres = res.tyres || {};
+    var mt = res.times[sel.id] = res.times[sel.id] || {}, my = res.tyres[sel.id] = res.tyres[sel.id] || {}, n = 0, nG = 0, seen = {}, unk = [];
+    rec.rows.forEach(function (x) {
+      if (!x.did || seen[x.did]) return;
+      seen[x.did] = 1;
+      if (x.v !== null && mt[x.did] !== x.v) { mt[x.did] = x.v; n++; }
+      var ty = crewTyreOf(r, x), old = my[x.did];
+      if (ty.raw && !ty.t) unk.push(x.name + ' («' + ty.raw + '»)');
+      if (ty.t) {
+        var nw = { t: ty.t, s: old && old.t === ty.t && typeof old.s === 'number' ? old.s : 0, w: ty.w !== null ? ty.w : (old && typeof old.w === 'number' ? old.w : 0) };
+        if (!old || old.a || old.t !== nw.t || old.w !== nw.w) { my[x.did] = nw; nG++; }
+      } else if (ty.w !== null && old && (old.a || old.w !== ty.w)) { delete old.a; old.w = ty.w; nG++; }
+    });
+    if (n || nG) { cleanup(r.id); commit(); }
+    toast((n || nG ? 'Inseriti ' + plural(n, 'tempo', 'tempi') + ' e ' + plural(nG, 'dato gomme', 'dati gomme') + ' in ' + (labelsOf(r)[sel.id] || 'questa tappa') + '.' : 'Nessun dato nuovo da inserire.') + (unk.length ? ' Gomme non riconosciute: ' + unk.join(', ') + '.' : ''));
   }
   function telPick(flat, names) { for (var i = 0; i < names.length; i++) if (names[i] in flat) return flat[names[i]]; return null; }
   // Tiene l'ultimo messaggio di ogni tipo (stesse chiavi = stesso tipo), per poterli guardare e copiare
@@ -2346,9 +2406,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
         '<tr class="tyrow"><td></td><td colspan="2"><div class="tyre"><label class="sr" for="' + ty + '">Gomme di ' + esc(d.name) + '</label><select id="' + ty + '" data-change="tyre" data-stage="' + sel.id + '" data-driver="' + d.id + '">' + opts + '</select><div class="wears">' + wearBtns(sel.id, d, rec, 's') + wearBtns(sel.id, d, rec, 'w') + '</div>' + penHtml(s, r, sel, d) + '</div></td></tr>';
     }).join('') + '</tbody></table></div>';
   }
+  function noteOf(s, rid, sid, did) { var m = s.results[rid] && s.results[rid].notes, v = m && m[sid] && m[sid][did]; return typeof v === 'string' ? v : ''; }
+  // Penalità (triangolo di attenzione) e note: si aprono con un clic e restano aperte solo se contengono un dato
   function penHtml(s, r, sel, d) {
-    var v = penOf(s, r.id, sel.id, d.id), id = 'pn-' + sel.id + '-' + d.id;
-    return '<div class="pen"><label for="' + id + '">Penalità</label><input type="text" class="pn" id="' + id + '" value="' + (v ? esc(fmtTimeShort(v)) : '') + '" placeholder="0 (es. 10 oppure 1:05.5)" inputmode="decimal" autocomplete="off" spellcheck="false" data-change="pen" data-stage="' + sel.id + '" data-driver="' + d.id + '"><span class="mut">sec</span></div>';
+    var v = penOf(s, r.id, sel.id, d.id), nt = noteOf(s, r.id, sel.id, d.id), id = 'pn-' + sel.id + '-' + d.id, nid = 'nt-' + sel.id + '-' + d.id;
+    return '<div class="xtra">' +
+      '<div class="xt' + (v ? ' open' : '') + '"><button class="xt-btn warn-ico" type="button" data-action="xt-open" aria-expanded="' + (v ? 'true' : 'false') + '" aria-controls="' + id + '" aria-label="Penalità di ' + esc(d.name) + '" title="Penalità (secondi)">' +
+        '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 2.6 22.6 21H1.4z" fill="#d92d20" stroke="#d92d20" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/><circle cx="12" cy="18" r="1.35" fill="#fff"/></svg></button>' +
+        '<span class="xt-in"><input type="text" class="pn" id="' + id + '" value="' + (v ? esc(fmtTimeShort(v)) : '') + '" placeholder="es. 10 oppure 1:05.5" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Secondi di penalità di ' + esc(d.name) + '" data-change="pen" data-stage="' + sel.id + '" data-driver="' + d.id + '"><span class="mut">sec</span></span></div>' +
+      '<div class="xt xt-note' + (nt ? ' open' : '') + '"><button class="btn small ghost xt-btn" type="button" data-action="xt-open" aria-expanded="' + (nt ? 'true' : 'false') + '" aria-controls="' + nid + '">Note</button>' +
+        '<span class="xt-in"><input type="text" class="nt" id="' + nid + '" value="' + esc(nt) + '" placeholder="Note aggiuntive" maxlength="300" autocomplete="off" aria-label="Note su ' + esc(d.name) + '" data-change="note" data-stage="' + sel.id + '" data-driver="' + d.id + '"></span></div></div>';
   }
   function fmtTimeShort(ms) { return ms < 60000 ? String(ms / 1000).replace('.', ',') : fmtTime(ms); }
 
@@ -3344,7 +3411,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     if (r.times) Object.keys(r.times).forEach(function (k) { if (!Object.keys(r.times[k]).length) delete r.times[k]; });
     if (r.tyres) Object.keys(r.tyres).forEach(function (k) { if (!Object.keys(r.tyres[k]).length) delete r.tyres[k]; });
     if (r.pen) Object.keys(r.pen).forEach(function (k) { if (!Object.keys(r.pen[k]).length) delete r.pen[k]; });
-    if (RES_KEYS.concat(['times', 'tyres', 'pen']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
+    if (r.notes) { Object.keys(r.notes).forEach(function (k) { if (!Object.keys(r.notes[k]).length) delete r.notes[k]; }); if (!Object.keys(r.notes).length) delete r.notes; }
+    if (RES_KEYS.concat(['times', 'tyres', 'pen', 'notes']).every(function (k) { return !Object.keys(r[k] || {}).length; })) delete state.results[rid];
   }
 
 
@@ -3602,6 +3670,13 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       else toast('Copia non disponibile: seleziona il testo a mano.');
     },
     'crew-apply': function (el) { crewApply(el.dataset.key); },
+    'xt-open': function (el) {
+      var box = el.closest('.xt'), inp = box && box.querySelector('input');
+      if (!box || !inp) return;
+      if (box.dataset.shut && Date.now() - Number(box.dataset.shut) < 300) { box.dataset.shut = ''; return; }   // il clic che ha appena chiuso il campo vuoto non lo riapre
+      if (box.classList.contains('open')) { if (!inp.value.trim()) { box.classList.remove('open'); el.setAttribute('aria-expanded', 'false'); } else inp.focus(); return; }
+      box.classList.add('open'); el.setAttribute('aria-expanded', 'true'); inp.focus();
+    },
     'crew-hide': function (el) { var rec = crewData[el.dataset.key]; if (!rec) return; crewSave(el.dataset.key, rec.rows, rec.meta, { hidden: !rec.hidden }); crewShow(); },
     'crew-clear': function (el) { var rec = crewData[el.dataset.key]; if (!rec) return; crewSave(el.dataset.key, [], rec.meta, { hidden: false }); crewShow(); toast('Dati dell’area «Crew a fine tappa» cancellati.'); },
     'crew-reload': function (el) {
@@ -3648,6 +3723,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (state.results[r.id] && state.results[r.id].times) delete state.results[r.id].times[id];
       if (state.results[r.id] && state.results[r.id].tyres) delete state.results[r.id].tyres[id];
       if (state.results[r.id] && state.results[r.id].pen) delete state.results[r.id].pen[id];
+      if (state.results[r.id] && state.results[r.id].notes) delete state.results[r.id].notes[id];
       cleanup(r.id); ui.stage = null; ui.editStage = null;
       commit(); toast('Tappa eliminata');
     },
@@ -3669,6 +3745,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
           if (r.times) Object.keys(r.times).forEach(function (sid) { delete r.times[sid][id]; });
           if (r.tyres) Object.keys(r.tyres).forEach(function (sid) { delete r.tyres[sid][id]; });
           if (r.pen) Object.keys(r.pen).forEach(function (sid) { delete r.pen[sid][id]; });
+          if (r.notes) Object.keys(r.notes).forEach(function (sid) { delete r.notes[sid][id]; });
           cleanup(rid);
         });
       }
@@ -3863,6 +3940,16 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (v === null) delete m[did]; else m[did] = v;
       cleanup(rid);
       el.value = timeText(v);
+      refreshEvent();
+    },
+    note: function (el) {
+      var rid = ui.manage, sid = el.dataset.stage, did = el.dataset.driver, v = String(el.value || '').trim().slice(0, 300);
+      var res = state.results[rid] = state.results[rid] || { pos: {} };
+      res.notes = res.notes || {};
+      var m = res.notes[sid] = res.notes[sid] || {};
+      if (v) m[did] = v; else delete m[did];
+      cleanup(rid);
+      el.value = v;
       refreshEvent();
     },
     pen: function (el) {
