@@ -219,9 +219,10 @@ details.evstat .tablewrap { padding: 0 8px 10px; }
 .tel-conn { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
 .tel-conn select { width: auto; }
 @media (max-width: 560px) { .tel-conn { grid-template-columns: minmax(0, 1fr) auto; } .tel-conn input { grid-column: 1 / -1; } }
-.tel-me { display: grid; grid-template-columns: auto minmax(0, 260px); gap: 6px 10px; align-items: center; }
+.tel-me { display: grid; grid-template-columns: auto minmax(0, 260px) auto auto; justify-content: start; gap: 6px 10px; align-items: center; }
 .tel-me label { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
 .tel-me .hint { grid-column: 1 / -1; }
+@media (max-width: 560px) { .tel-me { grid-template-columns: auto minmax(0, 1fr); } }
 .tel-chart { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .tel-chead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 14px; }
 .tel-chead h5 { margin: 0; font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
@@ -1843,8 +1844,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     }).catch(function () { /* funzione non disponibile: resta nascosta */ });
   }
   /* ---------- Telemetria in diretta via WebSocket ---------- */
-  var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, len: null, raf: 0, want: false, retry: 0, tr: { mode: 'd', pts: [] }, hover: null };
-  try { tel.url = localStorage.getItem('rally-tel-url') || ''; tel.unit = localStorage.getItem('rally-tel-unit') === 'km' ? 'km' : 'm'; tel.me = localStorage.getItem('rally-tel-me') || ''; } catch (e) { /* ignora */ }
+  var tel = { ws: null, st: 'off', msg: '', url: '', unit: 'm', me: '', sig: '', thr: 0, brk: 0, dist: null, prog: null, len: null, raf: 0, want: false, retry: 0, tr: { mode: 'd', pts: [] }, hover: null, snd: true, ac: null, pf: null, bz: { mid: false, last: false } };
+  try { tel.url = localStorage.getItem('rally-tel-url') || ''; tel.unit = localStorage.getItem('rally-tel-unit') === 'km' ? 'km' : 'm'; tel.me = localStorage.getItem('rally-tel-me') || ''; tel.snd = localStorage.getItem('rally-tel-snd') !== '0'; } catch (e) { /* ignora */ }
   var TEL_KEYS = {
     thr: ['throttle', 'vehiclethrottle', 'throttleinput', 'gas', 'accelerator', 'acceleratore', 'accel'],
     brk: ['brake', 'vehiclebrake', 'brakeinput', 'freno'],
@@ -1868,6 +1869,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       '<label class="sr" for="tel-unit">Unità della distanza ricevuta</label><select id="tel-unit" data-change="tel-unit" title="Unità in cui la telemetria manda la distanza"><option value="m"' + (tel.unit === 'm' ? ' selected' : '') + '>Distanza in metri</option><option value="km"' + (tel.unit === 'km' ? ' selected' : '') + '>Distanza in km</option></select>' +
       (live ? '<button class="btn" type="button" data-action="tel-disconnect">Scollega</button>' : '<button class="btn primary" type="button" data-action="tel-connect">Collega</button>') + '</div>' +
       '<div class="tel-me"><label for="tel-me">Il mio pilota</label><select id="tel-me" data-change="tel-me"><option value="">— scegli —</option>' + (state && state.drivers ? state.drivers : []).map(function (d) { return '<option value="' + d.id + '"' + (d.id === tel.me ? ' selected' : '') + '>' + esc(d.name) + '</option>'; }).join('') + '</select>' +
+      '<label class="chk tel-snd"><input type="checkbox" data-change="tel-snd"' + (tel.snd ? ' checked' : '') + '>Segnali acustici</label><button class="btn small ghost" type="button" data-action="tel-test">Prova suono</button>' +
       '<span class="hint">A fine speciale il tuo tempo va a questo pilota e quelli degli avversari ai piloti con lo stesso nome equivalente.</span></div>' +
       '<div class="tel-body"><div class="tel-chart"><div class="tel-chead"><h5>Ultimi 2 km</h5><div class="tel-leg"><span><i style="background:var(--good)"></i>Acceleratore <b id="tel-ct-v"></b></span><span><i style="background:var(--bad)"></i>Freno <b id="tel-cb-v"></b></span><span class="tel-at" id="tel-c-at"></span></div></div>' +
       '<canvas class="tel-cv" id="tel-c" role="img" aria-label="Grafico: acceleratore e pressione del freno in percentuale negli ultimi 2 km percorsi"></canvas>' +
@@ -1894,7 +1896,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     frac = Math.max(0, Math.min(1, frac));
     document.getElementById('tel-bar').style.transform = 'scaleX(' + frac + ')';
     // Segni piccoli: la tappa si divide in 4 parti sotto i 10 km, 6 da 10 a 15, 8 fino a 20, 10 oltre i 20
-    var parts = !km ? 0 : km < 10 ? 4 : km <= 15 ? 6 : km <= 20 ? 8 : 10, tk = document.getElementById('tel-ticks');
+    var parts = telParts(km), tk = document.getElementById('tel-ticks');
     if (tk && tk.dataset.n !== String(parts)) {
       tk.dataset.n = parts;
       for (var th = '', ti = 1; ti < parts; ti++) if (ti * 2 !== parts) th += '<i class="tk" style="left:' + (ti / parts * 100) + '%"></i>';
@@ -1977,6 +1979,37 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   document.addEventListener('pointerdown', telHover);
   document.addEventListener('pointerout', function (e) { if (tel.hover !== null && e.target && e.target.classList && e.target.classList.contains('tel-cv')) { tel.hover = null; telQueue(); } });
   window.addEventListener('resize', function () { telQueue(); });
+  /* Segnali acustici: uno a metà tappa, due ravvicinati all'ultimo segno prima della fine */
+  function telAudio() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      if (!tel.ac) tel.ac = new AC();
+      if (tel.ac.state === 'suspended') tel.ac.resume();
+      return tel.ac;
+    } catch (e) { return null; }
+  }
+  function telBeep(times) {
+    var ac = tel.snd ? telAudio() : null;
+    if (!ac) return;
+    for (var i = 0; i < times; i++) {
+      var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime + i * 0.22, dur = times > 1 ? 0.12 : 0.25;
+      o.type = 'square'; o.frequency.value = times > 1 ? 1320 : 880;
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+    }
+  }
+  function telParts(km) { return !km ? 0 : km < 10 ? 4 : km <= 15 ? 6 : km <= 20 ? 8 : 10; }
+  function telKm() { var box = document.getElementById('tel-area'); return tel.len ? (tel.unit === 'km' ? tel.len : tel.len / 1000) : (box ? Number(box.dataset.km) || 0 : 0); }
+  function telCues() {
+    var km = telKm(), f = tel.dist !== null ? (km ? (tel.unit === 'km' ? tel.dist : tel.dist / 1000) / km : null) : tel.prog;
+    if (f === null || !isFinite(f)) return;
+    var prev = tel.pf, parts = telParts(km), last = parts ? (parts - 1) / parts : null;
+    tel.pf = f;
+    if (prev === null || f < prev - 0.05 || f < 0.02) { tel.bz = { mid: f >= 0.5, last: last !== null && f >= last }; return; }   // partenza o nuova prova: riarma
+    if (!tel.bz.mid && prev < 0.5 && f >= 0.5) { tel.bz.mid = true; telBeep(1); }
+    if (last !== null && !tel.bz.last && prev < last && f >= last && f < 1.02) { tel.bz.last = true; telBeep(2); }
+  }
   function telQueue() { if (!tel.raf) tel.raf = requestAnimationFrame(telPaint); }
   function telStatus(st, msg) {
     tel.st = st; tel.msg = msg || '';
@@ -2067,6 +2100,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       tel.dist = dv.getFloat32(8, true); tel.thr = telPedal(dv.getFloat32(116, true)); tel.brk = telPedal(dv.getFloat32(124, true));
       if (data.byteLength >= 248) { var tl = dv.getFloat32(244, true); if (isFinite(tl) && tl > 0) tel.len = tl; }
     } else return;
+    telCues();
     telSample();
     telQueue();
   }
@@ -2091,7 +2125,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     tel.want = false; clearTimeout(tel.retry);
     var ws = tel.ws; tel.ws = null;
     if (ws) { try { ws.close(); } catch (e) { /* ignora */ } }
-    tel.thr = 0; tel.brk = 0; tel.dist = null; tel.prog = null; tel.len = null;
+    tel.thr = 0; tel.brk = 0; tel.dist = null; tel.prog = null; tel.len = null; tel.pf = null;
     telStatus('off');
   }
 
@@ -3058,7 +3092,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   // Evento di una stagione archiviata: si può solo sfogliare (tappe, classifiche, gomme), niente modifiche
   function arcOn() { return !!ui.manageArc && (ui.tab === 'storico-eventi' || ui.tab === 'storico-campionati'); }
   function lockArchiveView() {
-    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect', 'tel-clear'];
+    var keep = ['pick-stage', 'cls', 'ev-view', 'hist-back', 'tab', 'menu', 'sub', 'theme', 'tel-connect', 'tel-disconnect', 'tel-clear', 'tel-test'];
     var drop = ['lock', 'toggle-add-stages', 'edit-stage', 'del-stage', 'time-rit', 'gm-add', 'gm-del', 'gm-copy', 'clear-results', 'edit-cancel', 'sa-row', 'sa-row-del'];
     Array.prototype.forEach.call($app.querySelectorAll('[data-action]'), function (b) {
       var a = b.getAttribute('data-action');
@@ -3353,9 +3387,11 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       tel.url = url;
       try { localStorage.setItem('rally-tel-url', url); } catch (e) { /* ignora */ }
       if (tel.ws) telClose();
+      telAudio();   // il browser lascia suonare solo dopo un tuo tocco: «Collega» sblocca l'audio
       tel.want = true; telOpen(); render();
     },
     'tel-disconnect': function () { telClose(); render(); },
+    'tel-test': function () { var was = tel.snd; tel.snd = true; telBeep(1); setTimeout(function () { telBeep(2); tel.snd = was; }, 700); },
     'tel-clear': function () { tel.tr.pts = []; tel.hover = null; telQueue(); },
     'time-rit': function (el) {
       var inp = document.getElementById(el.dataset['for']);
@@ -3515,6 +3551,11 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     return v.length ? v : undefined;
   }
   var changes = {
+    'tel-snd': function (el) {
+      tel.snd = !!el.checked;
+      try { localStorage.setItem('rally-tel-snd', tel.snd ? '1' : '0'); } catch (e) { /* ignora */ }
+      if (tel.snd) telAudio();
+    },
     'tel-me': function (el) {
       tel.me = el.value || '';
       try { localStorage.setItem('rally-tel-me', tel.me); } catch (e) { /* ignora */ }
