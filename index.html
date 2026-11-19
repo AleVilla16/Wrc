@@ -324,6 +324,8 @@ html.tel-lock, html.tel-lock body { overflow: hidden; }
 .brand-name { font-family: var(--f-display); font-weight: 700; font-size: 25px; line-height: 1.05; text-transform: uppercase; overflow-wrap: break-word; }
 .burger { order: 2; flex: none; width: 46px; height: 46px; display: grid; place-items: center; background: none; border: 0; border-radius: 8px; color: var(--ink-2); cursor: pointer; }
 .burger:hover { color: var(--ink); }
+.burger:disabled { opacity: .35; cursor: default; }
+.burger:disabled:hover { color: var(--ink-2); }
 .fsbtn { order: 1; }
 .menu { order: 3; flex-basis: 100%; display: none; flex-direction: column; gap: 6px; padding-block: 6px 14px; }
 .menu.open { display: flex; }
@@ -765,6 +767,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   var $toast = document.getElementById('toast');
   var state = undefined;            // undefined = in caricamento, null = nessun campionato
   var lastJson = '';
+  var undoStack = [];               // stati precedenti del campionato, per il tasto «Indietro»
   var ref = null;                   // riferimento db
   var memos = new WeakMap();        // cache dei risultati calcolati, per campionato, azzerata a ogni render
   var archive = undefined;           // undefined = in caricamento, altrimenti elenco dei campionati archiviati
@@ -1235,21 +1238,44 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     };
     return loop().then(function () { writing = false; });
   }
-  function commit() {
+  // Ogni modifica fatta da te passa di qui: lo stato di prima va nella pila del tasto «Indietro»
+  function snap() {
+    var j = JSON.stringify(state);
+    if (lastJson && j !== lastJson) { undoStack.push(lastJson); if (undoStack.length > 50) undoStack.shift(); }
+    lastJson = j;
+    updUndo();
+  }
+  function updUndo() {
+    var b = document.getElementById('undo-btn');
+    if (b) b.disabled = !undoStack.length;
+  }
+  function undo() {
+    if (!undoStack.length) { toast('Non c’è niente da annullare.'); return; }
+    var prev = undoStack.pop(), o = null;
+    try { o = JSON.parse(prev); } catch (e) { o = null; }
+    state = o ? normalize(o) : null;
     lastJson = JSON.stringify(state);
+    memos = new WeakMap();
+    ui.edit = null; ui.editStage = null; ui.confirm = null; ui.pend = null;
+    if (!state || (ui.manage && !findRally(state, ui.manage))) ui.manage = null;
+    render(); flush();
+    toast('Ultima modifica annullata');
+  }
+  function commit() {
+    snap();
     render();
     flush();
   }
   function onSnap(snap) {
     if (snap.metadata && snap.metadata.hasPendingWrites) return;
     if (!snap.exists) {
-      if (state !== null) { state = null; lastJson = 'null'; render(); }
+      if (state !== null) { state = null; lastJson = 'null'; undoStack = []; render(); }
       return;
     }
     var data = normalize(clone(snap.data()));
     var j = JSON.stringify(data);
     if (state !== undefined && j === lastJson) return;
-    state = data; lastJson = j; render();
+    state = data; lastJson = j; undoStack = []; render();
   }
   function init() {
     var saved = lsGet(LS_TAB);
@@ -1374,7 +1400,10 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
     var fsOn = !!(document.fullscreenElement || document.webkitFullscreenElement), de = document.documentElement;
     var fs = de.requestFullscreen || de.webkitRequestFullscreen ? '<button class="burger fsbtn" type="button" data-action="app-full" aria-pressed="' + fsOn + '" aria-label="' + (fsOn ? 'Esci dallo schermo intero' : 'Schermo intero') + '" title="' + (fsOn ? 'Esci dallo schermo intero' : 'Schermo intero') + '">' +
       '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (fsOn ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>') + '</svg></button>' : '';
-    return '<div class="bar-in"><div class="brand"><span class="logo">' + ICON_LOGO + '</span><span class="brand-name">' + esc(name) + '</span></div>' + fs + burger + nav + '</div>';
+    // Indietro: annulla l'ultima modifica (c'è sempre, anche dove manca lo schermo intero)
+    var undoB = '<button class="burger fsbtn undobtn" id="undo-btn" type="button" data-action="undo" aria-label="Indietro: annulla l’ultima modifica" title="Indietro: annulla l’ultima modifica (Ctrl+Z)"' + (undoStack.length ? '' : ' disabled') + '>' +
+      '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>';
+    return '<div class="bar-in"><div class="brand"><span class="logo">' + ICON_LOGO + '</span><span class="brand-name">' + esc(name) + '</span></div>' + undoB + fs + burger + nav + '</div>';
   }
   function footHtml() { return '<footer class="foot"><i></i><span id="save-status">' + esc(ui.status) + '</span></footer>'; }
 
@@ -3519,7 +3548,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   function setHtml(id, html) { var el = document.getElementById(id); if (el) el.innerHTML = html; }
   function refreshEvent() {
     memos = new WeakMap();
-    lastJson = JSON.stringify(state);
+    snap();
     var r = ui.manage && findRally(state, ui.manage);
     if (!r || !document.getElementById('cls-area')) { render(); flush(); return; }
     setHtml('ev-tags', tagsHtml(state, r));
@@ -3832,6 +3861,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       crewShow(); toast('Dati della telemetria reinseriti (' + plural(rec.src.length, 'crew', 'crew') + ').');
     },
     'tel-full': function () { telFull(!tel.full); },
+    undo: function () { undo(); },
     'app-full': function () {
       var de = document.documentElement, on = document.fullscreenElement || document.webkitFullscreenElement;
       try {
@@ -3921,7 +3951,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (!rec) return;
       rec[el.dataset.k === 's' ? 's' : 'w'] = Number(el.dataset.w); delete rec.a;
       syncWear(el.closest('tr'), rec);
-      lastJson = JSON.stringify(state); flush();
+      snap(); flush();
     },
     'logo-clear': function (el) {
       state.teams.forEach(function (t) { if (t.id === el.dataset.id) { t.logo = ''; t.logoRemoved = true; } });
@@ -4130,7 +4160,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (!v) delete m[did]; else { var o = m[did]; rec = m[did] = { t: v, s: o && typeof o.s === 'number' ? o.s : 0, w: o && typeof o.w === 'number' ? o.w : 0 }; }
       cleanup(rid);
       syncWear(el.closest('tr').previousElementSibling ? el.closest('tr') : el.closest('tr'), rec);
-      lastJson = JSON.stringify(state); flush();
+      snap(); flush();
     },
     'gm-type': function (el) {
       var r = findRally(state, ui.manage), g = r && gmGet(r, el.dataset.driver), p = g && g.plan[Number(el.dataset.i)]; if (!p) return;
@@ -4150,7 +4180,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       if (a.length) r.assenti = a; else delete r.assenti;
       var sr = sortedRallies(state), cnt = document.querySelector('[data-cnt="' + did + '"]');
       if (cnt) cnt.textContent = partCount(sr, { id: did }) + ' di ' + sr.length + ' eventi';
-      lastJson = JSON.stringify(state); flush();
+      snap(); flush();
     },
     'eq-rally': function (el) { ui.eqRally = el.value; render(); },
     equiv: function (el) {
@@ -4273,7 +4303,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       r.tappe.forEach(function (x) { if (x.id === el.dataset.stage) t = x; });
       if (!t) return;
       t[el.dataset.field] = el.value;
-      lastJson = JSON.stringify(state);
+      snap();
       setHtml('chips', chipsHtml(state, r));
       flush();
     },
@@ -4463,6 +4493,8 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
   });
   document.addEventListener('keydown', function (e) {
     var el = e.target;
+    // Ctrl+Z (Cmd+Z sul Mac) fuori dai campi di testo: come il tasto «Indietro»
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'z' || e.key === 'Z') && !(el && el.closest && el.closest('input, textarea, select, [contenteditable]'))) { e.preventDefault(); undo(); return; }
     if (document.getElementById('zoom')) {
       if (e.key === 'Escape') { closeZoom(); return; }
       if (e.key === 'ArrowLeft') { zoomStep(-1); return; }
@@ -4549,7 +4581,7 @@ fieldset.tyres legend { padding: 0; margin-bottom: 8px; }
       archive = (Array.isArray(row.archive) ? row.archive : []).map(function (a) { var n = normalize(clone(a)); n.id = a.id; n.savedAt = a.savedAt || 0; return n; });
       lsSet(LS_KEY, JSON.stringify(state)); lsSet(ARC_KEY, JSON.stringify(archive));
     } finally { cloud.applying = false; }
-    lastJson = JSON.stringify(state);
+    lastJson = JSON.stringify(state); undoStack = [];
     if (ui.manage && !findRally(state, ui.manage)) ui.manage = null;
     cloud.meta.lastSync = row.updated_at; cloud.meta.dirty = false; saveMeta();
     render(); setStatus('Sincronizzato');
